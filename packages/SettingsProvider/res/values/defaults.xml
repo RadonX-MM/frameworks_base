@@ -263,4 +263,7 @@
 
     <!-- Voice Call earpiece Volume,its value is from 0 to 5,default value is 4 -->
     <integer name="def_voice_call_earpiece_volume" translatable="false">4</integer>
+
+    <!-- Default for Settings.Global.TETHER_DUN_REQUIRED -->
+    <integer name="def_tether_dun_required">0</integer>
 </resources>

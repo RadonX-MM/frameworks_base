@@ -1384,7 +1384,7 @@ public class RenderScript {
     }
 
     /**
-     * calls create(ctx, ContextType.NORMAL, CREATE_FLAG_NONE)
+     * calls create(cts, ContextType.NORMAL, CREATE_FLAG_NONE)
      *
      * See documentation for @create for details
      *
@@ -1396,7 +1396,7 @@ public class RenderScript {
     }
 
     /**
-     * calls create(ctx, ct, CREATE_FLAG_NONE)
+     * calls create(cts, ct, CREATE_FLAG_NONE)
      *
      * See documentation for @create for details
      *
@@ -1408,8 +1408,7 @@ public class RenderScript {
         return create(ctx, ct, CREATE_FLAG_NONE);
     }
 
-
-    /**
+     /**
      * Gets or creates a RenderScript context of the specified type.
      *
      * The returned context will be cached for future reuse within
@@ -1431,7 +1430,25 @@ public class RenderScript {
      */
     public static RenderScript create(Context ctx, ContextType ct, int flags) {
         int v = ctx.getApplicationInfo().targetSdkVersion;
-        return create(ctx, v, ct, flags);
+        if (v < 23) {
+            return internalCreate(ctx, v, ct, flags);
+        }
+
+        synchronized (mProcessContextList) {
+            for (RenderScript prs : mProcessContextList) {
+                if ((prs.mContextType == ct) &&
+                    (prs.mContextFlags == flags) &&
+                    (prs.mContextSdkVersion == v)) {
+
+                    return prs;
+                }
+            }
+
+            RenderScript prs = internalCreate(ctx, v, ct, flags);
+            prs.mIsProcessContext = true;
+            mProcessContextList.add(prs);
+            return prs;
+        }
     }
 
     /**
@@ -1480,6 +1497,8 @@ public class RenderScript {
     }
 
     /**
+     * @hide
+     *
      * Releases all the process contexts.  This is the same as
      * calling .destroy() on each unique context retreived with
      * create(...). If no contexts have been created this

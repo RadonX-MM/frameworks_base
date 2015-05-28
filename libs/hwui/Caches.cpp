@@ -23,6 +23,7 @@
 #include "Properties.h"
 #include "renderstate/RenderState.h"
 #include "ShadowTessellator.h"
+#include "RenderState.h"
 #include "utils/GLUtils.h"
 
 #include <utils/Log.h>
@@ -272,9 +273,289 @@ void Caches::flush(FlushMode mode) {
 
     clearGarbage();
     glFinish();
+
     // Errors during cleanup should be considered non-fatal, dump them and
     // and move on. TODO: All errors or just errors like bad surface?
     GLUtils::dumpGLErrors();
+}
+
+///////////////////////////////////////////////////////////////////////////////
+// VBO
+///////////////////////////////////////////////////////////////////////////////
+
+bool Caches::bindMeshBuffer() {
+    return bindMeshBuffer(meshBuffer);
+}
+
+bool Caches::bindMeshBuffer(const GLuint buffer) {
+    if (mCurrentBuffer != buffer) {
+        glBindBuffer(GL_ARRAY_BUFFER, buffer);
+        mCurrentBuffer = buffer;
+        return true;
+    }
+    return false;
+}
+
+bool Caches::unbindMeshBuffer() {
+    if (mCurrentBuffer) {
+        glBindBuffer(GL_ARRAY_BUFFER, 0);
+        mCurrentBuffer = 0;
+        return true;
+    }
+    return false;
+}
+
+bool Caches::bindIndicesBufferInternal(const GLuint buffer) {
+    if (mCurrentIndicesBuffer != buffer) {
+        glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, buffer);
+        mCurrentIndicesBuffer = buffer;
+        return true;
+    }
+    return false;
+}
+
+bool Caches::bindQuadIndicesBuffer() {
+    if (!mMeshIndices) {
+        uint16_t* regionIndices = new uint16_t[gMaxNumberOfQuads * 6];
+        for (uint32_t i = 0; i < gMaxNumberOfQuads; i++) {
+            uint16_t quad = i * 4;
+            int index = i * 6;
+            regionIndices[index    ] = quad;       // top-left
+            regionIndices[index + 1] = quad + 1;   // top-right
+            regionIndices[index + 2] = quad + 2;   // bottom-left
+            regionIndices[index + 3] = quad + 2;   // bottom-left
+            regionIndices[index + 4] = quad + 1;   // top-right
+            regionIndices[index + 5] = quad + 3;   // bottom-right
+        }
+
+        glGenBuffers(1, &mMeshIndices);
+        bool force = bindIndicesBufferInternal(mMeshIndices);
+        glBufferData(GL_ELEMENT_ARRAY_BUFFER, gMaxNumberOfQuads * 6 * sizeof(uint16_t),
+                regionIndices, GL_STATIC_DRAW);
+
+        delete[] regionIndices;
+        return force;
+    }
+
+    return bindIndicesBufferInternal(mMeshIndices);
+}
+
+bool Caches::bindShadowIndicesBuffer() {
+    if (!mShadowStripsIndices) {
+        uint16_t* shadowIndices = new uint16_t[MAX_SHADOW_INDEX_COUNT];
+        ShadowTessellator::generateShadowIndices(shadowIndices);
+        glGenBuffers(1, &mShadowStripsIndices);
+        bool force = bindIndicesBufferInternal(mShadowStripsIndices);
+        glBufferData(GL_ELEMENT_ARRAY_BUFFER, MAX_SHADOW_INDEX_COUNT * sizeof(uint16_t),
+            shadowIndices, GL_STATIC_DRAW);
+
+        delete[] shadowIndices;
+        return force;
+    }
+
+    return bindIndicesBufferInternal(mShadowStripsIndices);
+}
+
+bool Caches::unbindIndicesBuffer() {
+    if (mCurrentIndicesBuffer) {
+        glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0);
+        mCurrentIndicesBuffer = 0;
+        return true;
+    }
+    return false;
+}
+
+///////////////////////////////////////////////////////////////////////////////
+// PBO
+///////////////////////////////////////////////////////////////////////////////
+
+bool Caches::bindPixelBuffer(const GLuint buffer) {
+    if (mCurrentPixelBuffer != buffer) {
+        glBindBuffer(GL_PIXEL_UNPACK_BUFFER, buffer);
+        mCurrentPixelBuffer = buffer;
+        return true;
+    }
+    return false;
+}
+
+bool Caches::unbindPixelBuffer() {
+    if (mCurrentPixelBuffer) {
+        glBindBuffer(GL_PIXEL_UNPACK_BUFFER, 0);
+        mCurrentPixelBuffer = 0;
+        return true;
+    }
+    return false;
+}
+
+///////////////////////////////////////////////////////////////////////////////
+// Meshes and textures
+///////////////////////////////////////////////////////////////////////////////
+
+void Caches::bindPositionVertexPointer(bool force, const GLvoid* vertices, GLsizei stride) {
+    if (force || vertices != mCurrentPositionPointer || stride != mCurrentPositionStride) {
+        GLuint slot = currentProgram->position;
+        glVertexAttribPointer(slot, 2, GL_FLOAT, GL_FALSE, stride, vertices);
+        mCurrentPositionPointer = vertices;
+        mCurrentPositionStride = stride;
+    }
+}
+
+void Caches::bindTexCoordsVertexPointer(bool force, const GLvoid* vertices, GLsizei stride) {
+    if (force || vertices != mCurrentTexCoordsPointer || stride != mCurrentTexCoordsStride) {
+        GLuint slot = currentProgram->texCoords;
+        glVertexAttribPointer(slot, 2, GL_FLOAT, GL_FALSE, stride, vertices);
+        mCurrentTexCoordsPointer = vertices;
+        mCurrentTexCoordsStride = stride;
+    }
+}
+
+void Caches::resetVertexPointers() {
+    mCurrentPositionPointer = this;
+    mCurrentTexCoordsPointer = this;
+}
+
+void Caches::resetTexCoordsVertexPointer() {
+    mCurrentTexCoordsPointer = this;
+}
+
+void Caches::enableTexCoordsVertexArray() {
+    if (!mTexCoordsArrayEnabled) {
+        glEnableVertexAttribArray(Program::kBindingTexCoords);
+        mCurrentTexCoordsPointer = this;
+        mTexCoordsArrayEnabled = true;
+    }
+}
+
+void Caches::disableTexCoordsVertexArray() {
+    if (mTexCoordsArrayEnabled) {
+        glDisableVertexAttribArray(Program::kBindingTexCoords);
+        mTexCoordsArrayEnabled = false;
+    }
+}
+
+void Caches::activeTexture(GLuint textureUnit) {
+    if (mTextureUnit != textureUnit) {
+        glActiveTexture(gTextureUnits[textureUnit]);
+        mTextureUnit = textureUnit;
+    }
+}
+
+void Caches::resetActiveTexture() {
+    mTextureUnit = -1;
+}
+
+void Caches::bindTexture(GLuint texture) {
+    if (mBoundTextures[mTextureUnit] != texture) {
+        glBindTexture(GL_TEXTURE_2D, texture);
+        mBoundTextures[mTextureUnit] = texture;
+    }
+}
+
+void Caches::bindTexture(GLenum target, GLuint texture) {
+    if (target == GL_TEXTURE_2D) {
+        bindTexture(texture);
+    } else {
+        // GLConsumer directly calls glBindTexture() with
+        // target=GL_TEXTURE_EXTERNAL_OES, don't cache this target
+        // since the cached state could be stale
+        glBindTexture(target, texture);
+    }
+}
+
+void Caches::deleteTexture(GLuint texture) {
+    // When glDeleteTextures() is called on a currently bound texture,
+    // OpenGL ES specifies that the texture is then considered unbound
+    // Consider the following series of calls:
+    //
+    // glGenTextures -> creates texture name 2
+    // glBindTexture(2)
+    // glDeleteTextures(2) -> 2 is now unbound
+    // glGenTextures -> can return 2 again
+    //
+    // If we don't call glBindTexture(2) after the second glGenTextures
+    // call, any texture operation will be performed on the default
+    // texture (name=0)
+
+    unbindTexture(texture);
+
+    glDeleteTextures(1, &texture);
+}
+
+void Caches::resetBoundTextures() {
+    memset(mBoundTextures, 0, REQUIRED_TEXTURE_UNITS_COUNT * sizeof(GLuint));
+}
+
+void Caches::unbindTexture(GLuint texture) {
+    for (int i = 0; i < REQUIRED_TEXTURE_UNITS_COUNT; i++) {
+        if (mBoundTextures[i] == texture) {
+            mBoundTextures[i] = 0;
+        }
+    }
+}
+
+///////////////////////////////////////////////////////////////////////////////
+// Scissor
+///////////////////////////////////////////////////////////////////////////////
+
+bool Caches::setScissor(GLint x, GLint y, GLint width, GLint height) {
+    if (scissorEnabled && (x != mScissorX || y != mScissorY ||
+            width != mScissorWidth || height != mScissorHeight)) {
+
+        if (x < 0) {
+            width += x;
+            x = 0;
+        }
+        if (y < 0) {
+            height += y;
+            y = 0;
+        }
+        if (width < 0) {
+            width = 0;
+        }
+        if (height < 0) {
+            height = 0;
+        }
+        glScissor(x, y, width, height);
+
+        mScissorX = x;
+        mScissorY = y;
+        mScissorWidth = width;
+        mScissorHeight = height;
+
+        return true;
+    }
+    return false;
+}
+
+bool Caches::enableScissor() {
+    if (!scissorEnabled) {
+        glEnable(GL_SCISSOR_TEST);
+        scissorEnabled = true;
+        resetScissor();
+        return true;
+    }
+    return false;
+}
+
+bool Caches::disableScissor() {
+    if (scissorEnabled) {
+        glDisable(GL_SCISSOR_TEST);
+        scissorEnabled = false;
+        return true;
+    }
+    return false;
+}
+
+void Caches::setScissorEnabled(bool enabled) {
+    if (scissorEnabled != enabled) {
+        if (enabled) glEnable(GL_SCISSOR_TEST);
+        else glDisable(GL_SCISSOR_TEST);
+        scissorEnabled = enabled;
+    }
+}
+
+void Caches::resetScissor() {
+    mScissorX = mScissorY = mScissorWidth = mScissorHeight = 0;
 }
 
 ///////////////////////////////////////////////////////////////////////////////

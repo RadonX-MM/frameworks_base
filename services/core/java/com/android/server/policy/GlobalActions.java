@@ -27,6 +27,7 @@ import android.app.ActivityManager;
 import android.app.ActivityManagerNative;
 import android.app.AlertDialog;
 import android.app.Dialog;
+import android.app.KeyguardManager;
 import android.content.BroadcastReceiver;
 import android.content.Context;
 import android.content.DialogInterface;
@@ -50,6 +51,7 @@ import android.os.UserHandle;
 import android.os.UserManager;
 import android.os.Vibrator;
 import android.provider.Settings;
+import android.provider.Settings.Global;
 import android.service.dreams.DreamService;
 import android.service.dreams.IDreamManager;
 import android.telephony.PhoneStateListener;
@@ -103,6 +105,9 @@ class GlobalActions implements DialogInterface.OnDismissListener, DialogInterfac
     private static final String GLOBAL_ACTION_KEY_LOCKDOWN = "lockdown";
     private static final String GLOBAL_ACTION_KEY_VOICEASSIST = "voiceassist";
     private static final String GLOBAL_ACTION_KEY_ASSIST = "assist";
+    private static final String GLOBAL_ACTION_KEY_REBOOT_RECOVERY = "reboot_recovery";
+    private static final String GLOBAL_ACTION_KEY_REBOOT_BOOTLOADER = "reboot_bootloader";
+    private static final String GLOBAL_ACTION_KEY_REBOOT_SOFT = "reboot_soft";
 
     private final Context mContext;
     private final WindowManagerFuncs mWindowManagerFuncs;
@@ -124,6 +129,8 @@ class GlobalActions implements DialogInterface.OnDismissListener, DialogInterfac
     private boolean mHasTelephony;
     private boolean mHasVibrator;
     private final boolean mShowSilentToggle;
+    private String[] mMenuActions;
+    private boolean mRebootMenu;
 
     /**
      * @param context everything needs a context :(
@@ -158,6 +165,8 @@ class GlobalActions implements DialogInterface.OnDismissListener, DialogInterfac
 
         mShowSilentToggle = SHOW_SILENT_TOGGLE && !mContext.getResources().getBoolean(
                 com.android.internal.R.bool.config_useFixedVolume);
+        mMenuActions = mContext.getResources().getStringArray(
+                com.android.internal.R.array.config_globalActionsList);
     }
 
     /**
@@ -165,6 +174,9 @@ class GlobalActions implements DialogInterface.OnDismissListener, DialogInterfac
      * @param keyguardShowing True if keyguard is showing
      */
     public void showDialog(boolean keyguardShowing, boolean isDeviceProvisioned) {
+        mRebootMenu = false;
+        mMenuActions = mContext.getResources().getStringArray(
+                com.android.internal.R.array.config_globalActionsList);
         mKeyguardShowing = keyguardShowing;
         mDeviceProvisioned = isDeviceProvisioned;
         if (mDialog != null) {
@@ -252,23 +264,33 @@ class GlobalActions implements DialogInterface.OnDismissListener, DialogInterfac
                 }
             }
 
+            @Override
             public boolean showDuringKeyguard() {
                 return true;
             }
 
+            @Override
+            public boolean showDuringRestrictedKeyguard() {
+                return true;
+            }
+
+            @Override
             public boolean showBeforeProvisioning() {
-                return false;
+                return true;
+            }
+
+            @Override
+            public boolean showForCurrentUser() {
+                return true;
             }
         };
         onAirplaneModeChanged();
 
         mItems = new ArrayList<Action>();
-        String[] defaultActions = mContext.getResources().getStringArray(
-                com.android.internal.R.array.config_globalActionsList);
 
         ArraySet<String> addedKeys = new ArraySet<String>();
-        for (int i = 0; i < defaultActions.length; i++) {
-            String actionKey = defaultActions[i];
+        for (int i = 0; i < mMenuActions.length; i++) {
+            String actionKey = mMenuActions[i];
             if (addedKeys.contains(actionKey)) {
                 // If we already have added this, don't add it again.
                 continue;
@@ -277,6 +299,12 @@ class GlobalActions implements DialogInterface.OnDismissListener, DialogInterfac
                 mItems.add(new PowerAction());
             } else if (GLOBAL_ACTION_KEY_REBOOT.equals(actionKey)) {
                 mItems.add(new RebootAction());
+            } else if (advancedRebootEnabled(mContext) && GLOBAL_ACTION_KEY_REBOOT_RECOVERY.equals(actionKey)) {
+                mItems.add(new RebootRecoveryAction());
+            } else if (advancedRebootEnabled(mContext) && GLOBAL_ACTION_KEY_REBOOT_BOOTLOADER.equals(actionKey)) {
+                mItems.add(new RebootBootloaderAction());
+            } else if (advancedRebootEnabled(mContext) && GLOBAL_ACTION_KEY_REBOOT_SOFT.equals(actionKey)) {
+                mItems.add(new RebootSoftAction());
             } else if (GLOBAL_ACTION_KEY_AIRPLANE.equals(actionKey)) {
                 mItems.add(mAirplaneModeOn);
             } else if (GLOBAL_ACTION_KEY_BUGREPORT.equals(actionKey)) {
@@ -360,7 +388,17 @@ class GlobalActions implements DialogInterface.OnDismissListener, DialogInterfac
         }
 
         @Override
+        public boolean showDuringRestrictedKeyguard() {
+            return true;
+        }
+
+        @Override
         public boolean showBeforeProvisioning() {
+            return true;
+        }
+
+        @Override
+        public boolean showForCurrentUser() {
             return true;
         }
 
@@ -375,6 +413,11 @@ class GlobalActions implements DialogInterface.OnDismissListener, DialogInterfac
         private RebootAction() {
             super(com.android.internal.R.drawable.ic_lock_power_reboot,
                     R.string.global_action_reboot);
+            if (mRebootMenu) {
+                mMessageResId = R.string.global_action_reboot_sub;
+            } else if (showRebootSubmenu() && advancedRebootEnabled(mContext)) {
+                mMessageResId = R.string.global_action_reboot_more;
+            }
         }
 
         @Override
@@ -383,20 +426,133 @@ class GlobalActions implements DialogInterface.OnDismissListener, DialogInterfac
         }
 
         @Override
+        public boolean showDuringRestrictedKeyguard() {
+            return true;
+       }
+
+        @Override
         public boolean showBeforeProvisioning() {
             return true;
         }
 
         @Override
+        public boolean showForCurrentUser() {
+            return true;
+        }
+
+        @Override
         public void onPress() {
-            try {
-                IPowerManager pm = IPowerManager.Stub.asInterface(ServiceManager
-                        .getService(Context.POWER_SERVICE));
-                pm.reboot(true, null, false);
-            } catch (RemoteException e) {
-                Log.e(TAG, "PowerManager service died!", e);
-                return;
+            if (mRebootMenu || !advancedRebootEnabled(mContext) || !showRebootSubmenu()) {
+                mWindowManagerFuncs.reboot(null, false);
+            } else {
+                mMenuActions = mContext.getResources().getStringArray(
+                    com.android.internal.R.array.config_rebootActionsList);
+                if (mDialog != null) {
+                    mDialog.dismiss();
+                    mDialog = null;
+                }
+                mRebootMenu = true;
+                handleShow();
             }
+        }
+    }
+
+    private final class RebootRecoveryAction extends SinglePressAction {
+        private RebootRecoveryAction() {
+            super(com.android.internal.R.drawable.ic_lock_power_rebootrecovery,
+                    R.string.global_action_reboot_recovery);
+        }
+
+        @Override
+        public boolean showDuringKeyguard() {
+            return true;
+        }
+
+        @Override
+        public boolean showDuringRestrictedKeyguard() {
+            return false;
+        }
+
+        @Override
+        public boolean showBeforeProvisioning() {
+            return true;
+        }
+
+        @Override
+        public boolean showForCurrentUser() {
+            return UserHandle.getCallingUserId() == UserHandle.USER_OWNER;
+        }
+
+        @Override
+        public void onPress() {
+            mWindowManagerFuncs.reboot("recovery", false);
+        }
+    }
+
+    private final class RebootBootloaderAction extends SinglePressAction {
+        private RebootBootloaderAction() {
+            super(com.android.internal.R.drawable.ic_lock_power_rebootbootloader,
+                    R.string.global_action_reboot_bootloader);
+        }
+
+        @Override
+        public boolean showDuringKeyguard() {
+            return true;
+        }
+
+        @Override
+        public boolean showDuringRestrictedKeyguard() {
+            return false;
+        }
+
+        @Override
+        public boolean showBeforeProvisioning() {
+            return true;
+        }
+
+        @Override
+        public boolean showForCurrentUser() {
+            return UserHandle.getCallingUserId() == UserHandle.USER_OWNER;
+        }
+
+        @Override
+        public void onPress() {
+            mWindowManagerFuncs.reboot("bootloader", false);
+        }
+    }
+
+    private final class RebootSoftAction extends SinglePressAction {
+        private RebootSoftAction() {
+            super(com.android.internal.R.drawable.ic_lock_power_soft,
+                    R.string.global_action_reboot_soft);
+        }
+
+        @Override
+        public boolean showDuringKeyguard() {
+            return true;
+        }
+
+        @Override
+        public boolean showDuringRestrictedKeyguard() {
+            return false;
+        }
+
+        @Override
+        public boolean showBeforeProvisioning() {
+            return true;
+        }
+
+        @Override
+        public boolean showForCurrentUser() {
+            return UserHandle.getCallingUserId() == UserHandle.USER_OWNER;
+        }
+
+        @Override
+        public void onPress() {
+		String surfaceflinger = "surfacefliger";
+		SystemProperties.set("ctl.restart", surfaceflinger);
+		String zygote = "zygote";
+		SystemProperties.set("ctl.restart", zygote);
         }
     }
 
@@ -437,12 +593,24 @@ class GlobalActions implements DialogInterface.OnDismissListener, DialogInterfac
                 dialog.show();
             }
 
+            @Override
             public boolean showDuringKeyguard() {
                 return true;
             }
 
+            @Override
+            public boolean showDuringRestrictedKeyguard() {
+                return true;
+            }
+
+            @Override
             public boolean showBeforeProvisioning() {
                 return false;
+            }
+
+            @Override
+            public boolean showForCurrentUser() {
+                return true;
             }
 
             @Override
@@ -467,12 +635,22 @@ class GlobalActions implements DialogInterface.OnDismissListener, DialogInterfac
             }
 
             @Override
-            public boolean showDuringKeyguard() {
-                return true;
+            public boolean showDuringRestrictedKeyguard() {
+                return false;
             }
 
             @Override
             public boolean showBeforeProvisioning() {
+                return true;
+            }
+
+            @Override
+            public boolean showForCurrentUser() {
+                return true;
+            }
+
+            @Override
+            public boolean showDuringKeyguard() {
                 return true;
             }
         };
@@ -494,7 +672,17 @@ class GlobalActions implements DialogInterface.OnDismissListener, DialogInterfac
             }
 
             @Override
+            public boolean showDuringRestrictedKeyguard() {
+                return true;
+            }
+
+            @Override
             public boolean showBeforeProvisioning() {
+                 return true;
+             }
+
+            @Override
+            public boolean showForCurrentUser() {
                 return true;
             }
         };
@@ -516,7 +704,16 @@ class GlobalActions implements DialogInterface.OnDismissListener, DialogInterfac
             }
 
             @Override
+            public boolean showDuringRestrictedKeyguard() {
+                return false;
+            }
+
+            @Override
             public boolean showBeforeProvisioning() {
+                return true;
+            }
+            @Override
+            public boolean showForCurrentUser() {
                 return true;
             }
         };
@@ -541,9 +738,20 @@ class GlobalActions implements DialogInterface.OnDismissListener, DialogInterfac
                 return true;
             }
 
+
+            @Override
+            public boolean showDuringRestrictedKeyguard() {
+                return true;
+            }
+
             @Override
             public boolean showBeforeProvisioning() {
                 return false;
+            }
+
+            @Override
+            public boolean showForCurrentUser() {
+                return true;
             }
         };
     }
@@ -584,12 +792,24 @@ class GlobalActions implements DialogInterface.OnDismissListener, DialogInterfac
                             }
                         }
 
+                        @Override
                         public boolean showDuringKeyguard() {
                             return true;
                         }
 
+                        @Override
+                        public boolean showDuringRestrictedKeyguard() {
+                            return true;
+                        }
+
+                        @Override
                         public boolean showBeforeProvisioning() {
                             return false;
+                        }
+
+                        @Override
+                        public boolean showForCurrentUser() {
+                            return true;
                         }
                     };
                     items.add(switchToUser);
@@ -603,31 +823,22 @@ class GlobalActions implements DialogInterface.OnDismissListener, DialogInterfac
         mAirplaneModeOn.updateState(mAirplaneState);
         mAdapter.notifyDataSetChanged();
         mDialog.getWindow().setType(WindowManager.LayoutParams.TYPE_KEYGUARD_DIALOG);
-        if (mShowSilentToggle) {
-            IntentFilter filter = new IntentFilter(AudioManager.RINGER_MODE_CHANGED_ACTION);
-            mContext.registerReceiver(mRingerModeReceiver, filter);
-        }
     }
 
     private void refreshSilentMode() {
+        final int ringerMode = mAudioManager.getRingerMode();
         if (!mHasVibrator) {
             final boolean silentModeOn =
-                    mAudioManager.getRingerMode() != AudioManager.RINGER_MODE_NORMAL;
+                    ringerMode != AudioManager.RINGER_MODE_NORMAL;
             ((ToggleAction)mSilentModeAction).updateState(
                     silentModeOn ? ToggleAction.State.On : ToggleAction.State.Off);
+        } else {
+            ((SilentModeTriStateAction)mSilentModeAction).updateState(ringerMode);
         }
     }
 
     /** {@inheritDoc} */
     public void onDismiss(DialogInterface dialog) {
-        if (mShowSilentToggle) {
-            try {
-                mContext.unregisterReceiver(mRingerModeReceiver);
-            } catch (IllegalArgumentException ie) {
-                // ignore this
-                Log.w(TAG, ie);
-            }
-        }
     }
 
     /** {@inheritDoc} */
@@ -652,10 +863,7 @@ class GlobalActions implements DialogInterface.OnDismissListener, DialogInterfac
             for (int i = 0; i < mItems.size(); i++) {
                 final Action action = mItems.get(i);
 
-                if (mKeyguardShowing && !action.showDuringKeyguard()) {
-                    continue;
-                }
-                if (!mDeviceProvisioned && !action.showBeforeProvisioning()) {
+                if (!isActionVisible(action)) {
                     continue;
                 }
                 count++;
@@ -678,10 +886,8 @@ class GlobalActions implements DialogInterface.OnDismissListener, DialogInterfac
             int filteredPos = 0;
             for (int i = 0; i < mItems.size(); i++) {
                 final Action action = mItems.get(i);
-                if (mKeyguardShowing && !action.showDuringKeyguard()) {
-                    continue;
-                }
-                if (!mDeviceProvisioned && !action.showBeforeProvisioning()) {
+
+                if (!isActionVisible(action)) {
                     continue;
                 }
                 if (filteredPos == position) {
@@ -735,10 +941,21 @@ class GlobalActions implements DialogInterface.OnDismissListener, DialogInterfac
         boolean showDuringKeyguard();
 
         /**
+         * @return whether this action should appear in the dialog when a restricted 
+         * keyguard is showing.
+         */
+        boolean showDuringRestrictedKeyguard();
+
+        /**
          * @return whether this action should appear in the dialog before the
          *   device is provisioned.
          */
         boolean showBeforeProvisioning();
+
+        /**
+         * @return whether this action should appear in the dialog for the current user
+         */
+        boolean showForCurrentUser();
 
         boolean isEnabled();
     }
@@ -757,7 +974,7 @@ class GlobalActions implements DialogInterface.OnDismissListener, DialogInterfac
     private static abstract class SinglePressAction implements Action {
         private final int mIconResId;
         private final Drawable mIcon;
-        private final int mMessageResId;
+        protected int mMessageResId;
         private final CharSequence mMessage;
 
         protected SinglePressAction(int iconResId, int messageResId) {
@@ -976,12 +1193,24 @@ class GlobalActions implements DialogInterface.OnDismissListener, DialogInterfac
             }
         }
 
+	@Override
         public boolean showDuringKeyguard() {
             return true;
         }
 
+        @Override
+        public boolean showDuringRestrictedKeyguard() {
+            return true;
+        }
+
+        @Override
         public boolean showBeforeProvisioning() {
-            return false;
+            return true;
+        }
+
+        @Override
+        public boolean showForCurrentUser() {
+            return true;
         }
     }
 
@@ -992,6 +1221,7 @@ class GlobalActions implements DialogInterface.OnDismissListener, DialogInterfac
         private final AudioManager mAudioManager;
         private final Handler mHandler;
         private final Context mContext;
+        private int mRingerMode;
 
         SilentModeTriStateAction(Context context, AudioManager audioManager, Handler handler) {
             mAudioManager = audioManager;
@@ -1018,7 +1248,7 @@ class GlobalActions implements DialogInterface.OnDismissListener, DialogInterfac
                 LayoutInflater inflater) {
             View v = inflater.inflate(R.layout.global_actions_silent_mode, parent, false);
 
-            int selectedIndex = ringerModeToIndex(mAudioManager.getRingerMode());
+            int selectedIndex = ringerModeToIndex(mRingerMode);
             for (int i = 0; i < 3; i++) {
                 View itemView = v.findViewById(ITEM_IDS[i]);
                 itemView.setSelected(selectedIndex == i);
@@ -1032,12 +1262,24 @@ class GlobalActions implements DialogInterface.OnDismissListener, DialogInterfac
         public void onPress() {
         }
 
+        @Override
         public boolean showDuringKeyguard() {
             return true;
         }
 
+        @Override
+        public boolean showDuringRestrictedKeyguard() {
+            return true;
+        }
+
+        @Override
         public boolean showBeforeProvisioning() {
-            return false;
+            return true;
+        }
+
+        @Override
+        public boolean showForCurrentUser() {
+            return true;
         }
 
         public boolean isEnabled() {
@@ -1051,9 +1293,18 @@ class GlobalActions implements DialogInterface.OnDismissListener, DialogInterfac
             if (!(v.getTag() instanceof Integer)) return;
 
             int index = (Integer) v.getTag();
-            mAudioManager.setRingerMode(indexToRingerMode(index));
+            mRingerMode = indexToRingerMode(index);
+            mAudioManager.setRingerMode(mRingerMode);
+
+            if (mRingerMode == AudioManager.RINGER_MODE_SILENT) {
+                Global.putInt(mContext.getContentResolver(),
+                    Global.ZEN_MODE, Global.ZEN_MODE_NO_INTERRUPTIONS);
+            }
             mHandler.sendEmptyMessageDelayed(MESSAGE_DISMISS, DIALOG_DISMISS_DELAY);
         }
+        public void updateState(int ringerMode) {
+            mRingerMode = ringerMode;
+	}
     }
 
     private BroadcastReceiver mBroadcastReceiver = new BroadcastReceiver() {
@@ -1156,6 +1407,66 @@ class GlobalActions implements DialogInterface.OnDismissListener, DialogInterfac
         if (!mHasTelephony) {
             mAirplaneState = on ? ToggleAction.State.On : ToggleAction.State.Off;
         }
+    }
+
+    private boolean advancedRebootEnabled(Context context) {
+        boolean devOptionsEnabled = Settings.Secure.getInt(context.getContentResolver(),
+                Settings.Secure.DEVELOPER_OPTIONS_ENABLED, 0) == 1;
+        return Settings.Secure.getInt(context.getContentResolver(),
+                Settings.Secure.ADVANCED_REBOOT, devOptionsEnabled ? 1 : 0) == 1;
+    }
+
+    private boolean isActionVisible(Action action) {
+        if (mKeyguardShowing) {
+            KeyguardManager km = (KeyguardManager) mContext.getSystemService(Context.KEYGUARD_SERVICE);
+            boolean locked = km.inKeyguardRestrictedInputMode() && km.isKeyguardSecure();
+
+            if (!locked && !action.showDuringKeyguard()) {
+                return false;
+            }
+            if (locked && !action.showDuringRestrictedKeyguard()) {
+                return false;
+            }
+        }
+        if (!mDeviceProvisioned && !action.showBeforeProvisioning()) {
+            return false;
+        }
+        if (!action.showForCurrentUser()) {
+            return false;
+        }
+        return true;
+    }
+
+    private List<Action> getCurrentRebootMenuItems() {
+        List<Action> items = new ArrayList<Action>();
+
+        String[] rebootMenuActions = mContext.getResources().getStringArray(
+                    com.android.internal.R.array.config_rebootActionsList);
+        for (int i = 0; i < rebootMenuActions.length; i++) {
+            String actionKey = rebootMenuActions[i];
+            if (advancedRebootEnabled(mContext) && GLOBAL_ACTION_KEY_REBOOT_RECOVERY.equals(actionKey)) {
+                RebootRecoveryAction a = new RebootRecoveryAction();
+                if (isActionVisible(a)) {
+                    items.add(a);
+                }
+            } else if (advancedRebootEnabled(mContext) && GLOBAL_ACTION_KEY_REBOOT_BOOTLOADER.equals(actionKey)) {
+                RebootBootloaderAction a = new RebootBootloaderAction();
+                if (isActionVisible(a)) {
+                    items.add(a);
+                }
+            } else if (advancedRebootEnabled(mContext) && GLOBAL_ACTION_KEY_REBOOT_SOFT.equals(actionKey)) {
+                RebootSoftAction a = new RebootSoftAction();
+                if (isActionVisible(a)) {
+                    items.add(a);
+                }
+	    }
+        }
+        return items;
+    }
+
+    private boolean showRebootSubmenu() {
+        List<Action> rebootMenuItems = getCurrentRebootMenuItems();
+        return rebootMenuItems.size() > 0;
     }
 
     private static final class GlobalActionsDialog extends Dialog implements DialogInterface {

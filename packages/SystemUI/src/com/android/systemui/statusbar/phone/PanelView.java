@@ -141,7 +141,6 @@ public abstract class PanelView extends FrameLayout {
     };
 
     protected void onExpandingFinished() {
-        endClosing();
         mBar.onExpandingFinished();
     }
 
@@ -156,6 +155,7 @@ public abstract class PanelView extends FrameLayout {
     }
 
     protected final void notifyExpandingFinished() {
+        endClosing();
         if (mExpanding) {
             mExpanding = false;
             onExpandingFinished();
@@ -407,7 +407,7 @@ public abstract class PanelView extends FrameLayout {
                     || forceCancel;
             DozeLog.traceFling(expand, mTouchAboveFalsingThreshold,
                     mStatusBar.isFalsingThresholdNeeded(),
-                    mStatusBar.isScreenOnComingFromTouch());
+                    mStatusBar.isWakeUpComingFromTouch());
                     // Log collapse gesture if on lock screen.
                     if (!expand && mStatusBar.getBarState() == StatusBarState.KEYGUARD) {
                         float displayDensity = mStatusBar.getDisplayDensity();
@@ -436,7 +436,7 @@ public abstract class PanelView extends FrameLayout {
     }
 
     private int getFalsingThreshold() {
-        float factor = mStatusBar.isScreenOnComingFromTouch() ? 1.5f : 1.0f;
+        float factor = mStatusBar.isWakeUpComingFromTouch() ? 1.5f : 1.0f;
         return (int) (mUnlockFalsingThreshold * factor);
     }
 

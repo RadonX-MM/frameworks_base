@@ -54,7 +54,6 @@ public class StackStateAnimator {
     public static final int ANIMATION_DELAY_PER_ELEMENT_DARK = 24;
     public static final int DELAY_EFFECT_MAX_INDEX_DIFFERENCE = 2;
     public static final int DELAY_EFFECT_MAX_INDEX_DIFFERENCE_CHILDREN = 3;
-    public static final int ANIMATION_DELAY_HEADS_UP = 120;
 
     private static final int TAG_ANIMATOR_TRANSLATION_Y = R.id.translation_y_animator_tag;
     private static final int TAG_ANIMATOR_TRANSLATION_Z = R.id.translation_z_animator_tag;
@@ -320,9 +319,6 @@ public class StackStateAnimator {
         }
         if (mAnimationFilter.hasGoToFullShadeEvent) {
             return calculateDelayGoToFullShade(viewState);
-        }
-        if (mAnimationFilter.hasHeadsUpDisappearClickEvent) {
-            return ANIMATION_DELAY_HEADS_UP;
         }
         long minDelay = 0;
         for (NotificationStackScrollLayout.AnimationEvent event : mNewEvents) {
@@ -894,9 +890,7 @@ public class StackStateAnimator {
                 mHeadsUpAppearChildren.add(changingView);
                 finalState.applyState(changingView, mTmpState);
             } else if (event.animationType == NotificationStackScrollLayout
-                            .AnimationEvent.ANIMATION_TYPE_HEADS_UP_DISAPPEAR ||
-                    event.animationType == NotificationStackScrollLayout
-                            .AnimationEvent.ANIMATION_TYPE_HEADS_UP_DISAPPEAR_CLICK) {
+                    .AnimationEvent.ANIMATION_TYPE_HEADS_UP_DISAPPEAR) {
                 mHeadsUpDisappearChildren.add(changingView);
                 if (mHostLayout.indexOfChild(changingView) == -1) {
                     // This notification was actually removed, so we need to add it to the overlay
@@ -906,11 +900,7 @@ public class StackStateAnimator {
                     // We temporarily enable Y animations, the real filter will be combined
                     // afterwards anyway
                     mAnimationFilter.animateY = true;
-                    startViewAnimations(changingView, mTmpState,
-                            event.animationType == NotificationStackScrollLayout
-                                    .AnimationEvent.ANIMATION_TYPE_HEADS_UP_DISAPPEAR_CLICK
-                                            ? ANIMATION_DELAY_HEADS_UP
-                                            : 0,
+                    startViewAnimations(changingView, mTmpState, 0,
                             ANIMATION_DURATION_HEADS_UP_DISAPPEAR);
                     mChildrenToClearFromOverlay.add(changingView);
                 }

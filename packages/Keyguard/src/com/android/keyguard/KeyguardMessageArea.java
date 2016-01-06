@@ -39,18 +39,15 @@ class KeyguardMessageArea extends TextView implements SecurityMessageDisplay {
      * lift-to-type from interrupting itself.
      */
     private static final long ANNOUNCEMENT_DELAY = 250;
-    private static final int DEFAULT_COLOR = -1;
 
     private static final int SECURITY_MESSAGE_DURATION = 5000;
 
     private final KeyguardUpdateMonitor mUpdateMonitor;
     private final Handler mHandler;
-    private final int mDefaultColor;
 
     // Timeout before we reset the message to show charging/owner info
     long mTimeout = SECURITY_MESSAGE_DURATION;
     CharSequence mMessage;
-    private int mNextMessageColor = DEFAULT_COLOR;
 
     private final Runnable mClearMessageRunnable = new Runnable() {
         @Override
@@ -81,13 +78,7 @@ class KeyguardMessageArea extends TextView implements SecurityMessageDisplay {
         mUpdateMonitor.registerCallback(mInfoCallback);
         mHandler = new Handler(Looper.myLooper());
 
-        mDefaultColor = getCurrentTextColor();
         update();
-    }
-
-    @Override
-    public void setNextMessageColor(int color) {
-        mNextMessageColor = color;
     }
 
     @Override
@@ -160,12 +151,6 @@ class KeyguardMessageArea extends TextView implements SecurityMessageDisplay {
         CharSequence status = mMessage;
         setVisibility(TextUtils.isEmpty(status) ? INVISIBLE : VISIBLE);
         setText(status);
-        int color = mDefaultColor;
-        if (mNextMessageColor != DEFAULT_COLOR) {
-            color = mNextMessageColor;
-            mNextMessageColor = DEFAULT_COLOR;
-        }
-        setTextColor(color);
     }
 
 

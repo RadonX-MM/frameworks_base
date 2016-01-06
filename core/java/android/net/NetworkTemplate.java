@@ -288,8 +288,7 @@ public class NetworkTemplate implements Parcelable {
         } else {
             final boolean matchesType = (sForceAllNetworkTypes
                     || contains(DATA_USAGE_NETWORK_TYPES, ident.mType));
-            return matchesType && !ArrayUtils.isEmpty(mMatchSubscriberIds)
-                    && ArrayUtils.contains(mMatchSubscriberIds, ident.mSubscriberId);
+            return matchesType && ArrayUtils.contains(mMatchSubscriberIds, ident.mSubscriberId);
         }
     }
 

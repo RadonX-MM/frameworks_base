@@ -15,6 +15,10 @@
  */
 package com.android.keyguard;
 
+import android.animation.Animator;
+import android.animation.AnimatorListenerAdapter;
+import android.animation.ObjectAnimator;
+import android.animation.ValueAnimator;
 import android.content.Context;
 import android.graphics.Rect;
 import android.os.AsyncTask;
@@ -24,6 +28,7 @@ import android.text.TextUtils;
 import android.util.AttributeSet;
 import android.util.Log;
 import android.view.MotionEvent;
+import android.view.RenderNodeAnimator;
 import android.view.View;
 import android.view.ViewGroup;
 import android.view.animation.AnimationUtils;
@@ -332,19 +337,8 @@ public class KeyguardPatternView extends LinearLayout implements KeyguardSecurit
                 mSecurityMessageDisplay.setMessage(R.string.kg_prompt_reason_restart_pattern,
                         true /* important */);
                 break;
-            case PROMPT_REASON_TIMEOUT:
-                mSecurityMessageDisplay.setMessage(R.string.kg_prompt_reason_timeout_pattern,
-                        true /* important */);
-                break;
             default:
-                break;
         }
-    }
-
-    @Override
-    public void showMessage(String message, int color) {
-        mSecurityMessageDisplay.setNextMessageColor(color);
-        mSecurityMessageDisplay.setMessage(message, true /* important */);
     }
 
     @Override

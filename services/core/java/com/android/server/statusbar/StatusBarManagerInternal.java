@@ -28,5 +28,4 @@ public interface StatusBarManagerInternal {
     void showScreenPinningRequest();
     void showAssistDisclosure();
     void startAssist(Bundle args);
-    void onCameraLaunchGestureDetected(int source);
 }

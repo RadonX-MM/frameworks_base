@@ -39,6 +39,7 @@ import android.content.Context;
 import android.content.pm.ApplicationInfo;
 import android.content.pm.IPackageManager;
 import android.content.pm.PackageManager;
+import android.content.pm.PackageManager.NameNotFoundException;
 import android.media.AudioAttributes;
 import android.os.AsyncTask;
 import android.os.Binder;
@@ -262,12 +263,12 @@ public class AppOpsService extends IAppOpsService.Stub {
                 Iterator<Ops> it = pkgs.values().iterator();
                 while (it.hasNext()) {
                     Ops ops = it.next();
-                    int curUid = -1;
+                    int curUid;
                     try {
-                        curUid = AppGlobals.getPackageManager().getPackageUidEtc(ops.packageName,
-                                PackageManager.GET_UNINSTALLED_PACKAGES,
+                        curUid = mContext.getPackageManager().getPackageUid(ops.packageName,
                                 UserHandle.getUserId(ops.uidState.uid));
-                    } catch (RemoteException ignored) {
+                    } catch (NameNotFoundException e) {
+                        curUid = -1;
                     }
                     if (curUid != ops.uidState.uid) {
                         Slog.i(TAG, "Pruning old package " + ops.packageName

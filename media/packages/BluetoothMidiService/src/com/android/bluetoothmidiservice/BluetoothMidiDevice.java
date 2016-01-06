@@ -147,22 +147,14 @@ public final class BluetoothMidiDevice {
             // switch to receiving notifications after initial characteristic read
             mBluetoothGatt.setCharacteristicNotification(characteristic, true);
 
-            // Use writeType that requests acknowledgement.
-            // This improves compatibility with various BLE-MIDI devices.
-            int originalWriteType = characteristic.getWriteType();
-            characteristic.setWriteType(BluetoothGattCharacteristic.WRITE_TYPE_DEFAULT);
-
             BluetoothGattDescriptor descriptor = characteristic.getDescriptor(
                     CLIENT_CHARACTERISTIC_CONFIG);
             if (descriptor != null) {
                 descriptor.setValue(BluetoothGattDescriptor.ENABLE_NOTIFICATION_VALUE);
-                boolean result = mBluetoothGatt.writeDescriptor(descriptor);
-                Log.d(TAG, "writeDescriptor returned " + result);
+                mBluetoothGatt.writeDescriptor(descriptor);
             } else {
                 Log.e(TAG, "No CLIENT_CHARACTERISTIC_CONFIG for device " + mBluetoothDevice);
             }
-
-            characteristic.setWriteType(originalWriteType);
         }
 
         @Override

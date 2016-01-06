@@ -135,7 +135,7 @@ abstract class DisplayDevice {
     /**
      * Sets the mode, if supported.
      */
-    public void requestColorTransformAndModeInTransactionLocked(int colorTransformId, int modeId) {
+    public void requestModeInTransactionLocked(int id) {
     }
 
     /**

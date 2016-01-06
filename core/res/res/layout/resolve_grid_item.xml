@@ -70,7 +70,6 @@
               android:minLines="2"
               android:maxLines="2"
               android:gravity="top|center_horizontal"
-              android:ellipsize="marquee"
-              android:visibility="gone" />
+              android:ellipsize="marquee" />
 </LinearLayout>
 

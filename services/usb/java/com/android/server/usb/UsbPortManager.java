@@ -26,13 +26,8 @@ import android.hardware.usb.UsbPort;
 import android.hardware.usb.UsbPortStatus;
 import android.os.Handler;
 import android.os.Message;
-import android.os.SystemClock;
-import android.os.SystemProperties;
 import android.os.UEventObserver;
 import android.os.UserHandle;
-import android.system.ErrnoException;
-import android.system.Os;
-import android.system.OsConstants;
 import android.util.ArrayMap;
 import android.util.Log;
 import android.util.Slog;
@@ -93,9 +88,6 @@ public class UsbPortManager {
     // Port data roles: host or device.
     private static final String PORT_DATA_ROLE_HOST = "host";
     private static final String PORT_DATA_ROLE_DEVICE = "device";
-
-    private static final String USB_TYPEC_PROP_PREFIX = "sys.usb.typec.";
-    private static final String USB_TYPEC_STATE = "sys.usb.typec.state";
 
     // All non-trivial role combinations.
     private static final int COMBO_SOURCE_HOST =
@@ -629,25 +621,16 @@ public class UsbPortManager {
         return 0;
     }
 
-    private static boolean fileIsRootWritable(String path) {
-        try {
-            // If the file is user writable, then it is root writable.
-            return (Os.stat(path).st_mode & OsConstants.S_IWUSR) != 0;
-        } catch (ErrnoException e) {
-            return false;
-        }
-    }
-
     private static boolean canChangeMode(File portDir) {
-        return fileIsRootWritable(new File(portDir, SYSFS_PORT_MODE).getPath());
+        return new File(portDir, SYSFS_PORT_MODE).canWrite();
     }
 
     private static boolean canChangePowerRole(File portDir) {
-        return fileIsRootWritable(new File(portDir, SYSFS_PORT_POWER_ROLE).getPath());
+        return new File(portDir, SYSFS_PORT_POWER_ROLE).canWrite();
     }
 
     private static boolean canChangeDataRole(File portDir) {
-        return fileIsRootWritable(new File(portDir, SYSFS_PORT_DATA_ROLE).getPath());
+        return new File(portDir, SYSFS_PORT_DATA_ROLE).canWrite();
     }
 
     private static String readFile(File dir, String filename) {
@@ -659,29 +642,16 @@ public class UsbPortManager {
         }
     }
 
-    private static boolean waitForState(String property, String state) {
-        // wait for the transition to complete.
-        // give up after 5 seconds.
-        // 5 seconds is probably too long, but we have seen hardware that takes
-        // over 3 seconds to change states.
-        String value = null;
-        for (int i = 0; i < 100; i++) {
-            // State transition is done when property is set to the new configuration
-            value = SystemProperties.get(property);
-            if (state.equals(value)) return true;
-            SystemClock.sleep(50);
-        }
-        Slog.e(TAG, "waitForState(" + state + ") for " + property + " FAILED: got " + value);
-        return false;
-    }
-
-    private static String propertyFromFilename(String filename) {
-        return USB_TYPEC_PROP_PREFIX + filename;
-    }
-
     private static boolean writeFile(File dir, String filename, String contents) {
-        SystemProperties.set(propertyFromFilename(filename), contents);
-        return waitForState(USB_TYPEC_STATE, contents);
+        final File file = new File(dir, filename);
+        try {
+            try (FileWriter writer = new FileWriter(file)) {
+                writer.write(contents);
+            }
+            return true;
+        } catch (IOException ex) {
+            return false;
+        }
     }
 
     private static void logAndPrint(int priority, IndentingPrintWriter pw, String msg) {

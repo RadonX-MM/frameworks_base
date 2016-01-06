@@ -1064,8 +1064,6 @@ class WindowStateAnimator {
                 mAnimator.getScreenRotationAnimationLocked(displayId);
         final boolean screenAnimation =
                 screenRotationAnimation != null && screenRotationAnimation.isAnimating();
-
-        mHasClipRect = false;
         if (selfTransformation || attachedTransformation != null
                 || appTransformation != null || screenAnimation) {
             // cache often used attributes locally
@@ -1141,6 +1139,7 @@ class WindowStateAnimator {
             // transforming since it is more important to have that
             // animation be smooth.
             mShownAlpha = mAlpha;
+            mHasClipRect = false;
             if (!mService.mLimitedAlphaCompositing
                     || (!PixelFormat.formatHasAlpha(mWin.mAttrs.format)
                     || (mWin.isIdentityMatrix(mDsDx, mDtDx, mDsDy, mDtDy)

@@ -19,7 +19,6 @@ package com.android.server.fingerprint;
 import android.content.Context;
 import android.hardware.fingerprint.Fingerprint;
 import android.os.Vibrator;
-import android.text.TextUtils;
 import android.util.SparseArray;
 
 import com.android.internal.annotations.GuardedBy;
@@ -65,10 +64,6 @@ public class FingerprintUtils {
     }
 
     public void renameFingerprintForUser(Context ctx, int fingerId, int userId, CharSequence name) {
-        if (TextUtils.isEmpty(name)) {
-            // Don't do the rename if it's empty
-            return;
-        }
         getStateForUser(ctx, userId).renameFingerprint(fingerId, name);
     }
 

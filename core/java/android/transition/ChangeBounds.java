@@ -432,24 +432,23 @@ public class ChangeBounds extends Transition {
                 return anim;
             }
         } else {
-            sceneRoot.getLocationInWindow(tempLocation);
-            int startX = (Integer) startValues.values.get(PROPNAME_WINDOW_X) - tempLocation[0];
-            int startY = (Integer) startValues.values.get(PROPNAME_WINDOW_Y) - tempLocation[1];
-            int endX = (Integer) endValues.values.get(PROPNAME_WINDOW_X) - tempLocation[0];
-            int endY = (Integer) endValues.values.get(PROPNAME_WINDOW_Y) - tempLocation[1];
+            int startX = (Integer) startValues.values.get(PROPNAME_WINDOW_X);
+            int startY = (Integer) startValues.values.get(PROPNAME_WINDOW_Y);
+            int endX = (Integer) endValues.values.get(PROPNAME_WINDOW_X);
+            int endY = (Integer) endValues.values.get(PROPNAME_WINDOW_Y);
             // TODO: also handle size changes: check bounds and animate size changes
             if (startX != endX || startY != endY) {
-                final int width = view.getWidth();
-                final int height = view.getHeight();
-                Bitmap bitmap = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888);
+                sceneRoot.getLocationInWindow(tempLocation);
+                Bitmap bitmap = Bitmap.createBitmap(view.getWidth(), view.getHeight(),
+                        Bitmap.Config.ARGB_8888);
                 Canvas canvas = new Canvas(bitmap);
                 view.draw(canvas);
                 final BitmapDrawable drawable = new BitmapDrawable(bitmap);
-                drawable.setBounds(startX, startY, startX + width, startY + height);
                 final float transitionAlpha = view.getTransitionAlpha();
                 view.setTransitionAlpha(0);
                 sceneRoot.getOverlay().add(drawable);
-                Path topLeftPath = getPathMotion().getPath(startX, startY, endX, endY);
+                Path topLeftPath = getPathMotion().getPath(startX - tempLocation[0],
+                        startY - tempLocation[1], endX - tempLocation[0], endY - tempLocation[1]);
                 PropertyValuesHolder origin = PropertyValuesHolder.ofObject(
                         DRAWABLE_ORIGIN_PROPERTY, null, topLeftPath);
                 ObjectAnimator anim = ObjectAnimator.ofPropertyValuesHolder(drawable, origin);

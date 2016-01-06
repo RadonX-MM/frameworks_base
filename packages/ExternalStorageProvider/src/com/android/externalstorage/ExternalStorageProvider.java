@@ -38,7 +38,6 @@ import android.provider.DocumentsContract;
 import android.provider.DocumentsContract.Document;
 import android.provider.DocumentsContract.Root;
 import android.provider.DocumentsProvider;
-import android.provider.MediaStore;
 import android.text.TextUtils;
 import android.util.ArrayMap;
 import android.util.DebugUtils;
@@ -381,31 +380,12 @@ public class ExternalStorageProvider extends DocumentsProvider {
     @Override
     public void deleteDocument(String docId) throws FileNotFoundException {
         final File file = getFileForDocId(docId);
-        final boolean isDirectory = file.isDirectory();
-        if (isDirectory) {
+        if (file.isDirectory()) {
             FileUtils.deleteContents(file);
         }
         if (!file.delete()) {
             throw new IllegalStateException("Failed to delete " + file);
         }
-
-        final ContentResolver resolver = getContext().getContentResolver();
-        final Uri externalUri = MediaStore.Files.getContentUri("external");
-
-        // Remove media store entries for any files inside this directory, using
-        // path prefix match. Logic borrowed from MtpDatabase.
-        if (isDirectory) {
-            final String path = file.getAbsolutePath() + "/";
-            resolver.delete(externalUri,
-                    "_data LIKE ?1 AND lower(substr(_data,1,?2))=lower(?3)",
-                    new String[] { path + "%", Integer.toString(path.length()), path });
-        }
-
-        // Remove media store entry for this exact file.
-        final String path = file.getAbsolutePath();
-        resolver.delete(externalUri,
-                "_data LIKE ?1 AND lower(_data)=lower(?2)",
-                new String[] { path, path });
     }
 
     @Override

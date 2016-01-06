@@ -16,17 +16,15 @@
 
 package android.text;
 
+import com.android.internal.annotations.GuardedBy;
+
 import android.annotation.Nullable;
 import android.util.Log;
 
-import com.android.internal.annotations.GuardedBy;
+import libcore.io.IoUtils;
 
 import java.io.File;
 import java.io.IOException;
-import java.io.RandomAccessFile;
-import java.nio.ByteBuffer;
-import java.nio.MappedByteBuffer;
-import java.nio.channels.FileChannel;
 import java.util.HashMap;
 import java.util.Locale;
 
@@ -47,29 +45,19 @@ public class Hyphenator {
     @GuardedBy("sLock")
     final static HashMap<Locale, Hyphenator> sMap = new HashMap<Locale, Hyphenator>();
 
-    final static Hyphenator sEmptyHyphenator =
-            new Hyphenator(StaticLayout.nLoadHyphenator(null, 0), null);
+    final static Hyphenator sEmptyHyphenator = new Hyphenator(StaticLayout.nLoadHyphenator(""));
 
     final private long mNativePtr;
 
-    // We retain a reference to the buffer to keep the memory mapping valid
-    @SuppressWarnings("unused")
-    final private ByteBuffer mBuffer;
-
-    private Hyphenator(long nativePtr, ByteBuffer b) {
+    private Hyphenator(long nativePtr) {
         mNativePtr = nativePtr;
-        mBuffer = b;
     }
 
-    public long getNativePtr() {
-        return mNativePtr;
-    }
-
-    public static Hyphenator get(@Nullable Locale locale) {
+    public static long get(@Nullable Locale locale) {
         synchronized (sLock) {
             Hyphenator result = sMap.get(locale);
             if (result != null) {
-                return result;
+                return result.mNativePtr;
             }
 
             // TODO: Convert this a proper locale-fallback system
@@ -79,7 +67,7 @@ public class Hyphenator {
             result = sMap.get(languageOnlyLocale);
             if (result != null) {
                 sMap.put(locale, result);
-                return result;
+                return result.mNativePtr;
             }
 
             // Fall back to script-only, if available
@@ -92,28 +80,22 @@ public class Hyphenator {
                 result = sMap.get(scriptOnlyLocale);
                 if (result != null) {
                     sMap.put(locale, result);
-                    return result;
+                    return result.mNativePtr;
                 }
             }
 
             sMap.put(locale, sEmptyHyphenator);  // To remember we found nothing.
         }
-        return sEmptyHyphenator;
+        return sEmptyHyphenator.mNativePtr;
     }
 
     private static Hyphenator loadHyphenator(String languageTag) {
-        String patternFilename = "hyph-" + languageTag.toLowerCase(Locale.US) + ".hyb";
+        String patternFilename = "hyph-"+languageTag.toLowerCase(Locale.US)+".pat.txt";
         File patternFile = new File(getSystemHyphenatorLocation(), patternFilename);
         try {
-            RandomAccessFile f = new RandomAccessFile(patternFile, "r");
-            try {
-                FileChannel fc = f.getChannel();
-                MappedByteBuffer buf = fc.map(FileChannel.MapMode.READ_ONLY, 0, fc.size());
-                long nativePtr = StaticLayout.nLoadHyphenator(buf, 0);
-                return new Hyphenator(nativePtr, buf);
-            } finally {
-                f.close();
-            }
+            String patternData = IoUtils.readFileAsString(patternFile.getAbsolutePath());
+            long nativePtr = StaticLayout.nLoadHyphenator(patternData);
+            return new Hyphenator(nativePtr);
         } catch (IOException e) {
             Log.e(TAG, "error loading hyphenation " + patternFile, e);
             return null;
@@ -166,7 +148,7 @@ public class Hyphenator {
         sMap.put(null, null);
 
         // TODO: replace this with a discovery-based method that looks into /system/usr/hyphen-data
-        String[] availableLanguages = {"en-US", "eu", "hu", "hy", "nb", "nn", "und-Ethi"};
+        String[] availableLanguages = {"en-US", "eu", "hu", "hy", "nb", "nn", "sa", "und-Ethi"};
         for (int i = 0; i < availableLanguages.length; i++) {
             String languageTag = availableLanguages[i];
             Hyphenator h = loadHyphenator(languageTag);

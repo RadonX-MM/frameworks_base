@@ -1048,14 +1048,6 @@ public final class Call {
     }
 
     /** {@hide} */
-    Call(Phone phone, String telecomCallId, InCallAdapter inCallAdapter, int state) {
-        mPhone = phone;
-        mTelecomCallId = telecomCallId;
-        mInCallAdapter = inCallAdapter;
-        mState = state;
-    }
-
-    /** {@hide} */
     final String internalGetCallId() {
         return mTelecomCallId;
     }

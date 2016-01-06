@@ -33,9 +33,7 @@ TaskManager::TaskManager() {
     // Get the number of available CPUs. This value does not change over time.
     int cpuCount = sysconf(_SC_NPROCESSORS_CONF);
 
-    // Really no point in making more than 2 of these worker threads, but
-    // we do want to limit ourselves to 1 worker thread on dual-core devices.
-    int workerCount = cpuCount > 2 ? 2 : 1;
+    int workerCount = MathUtils::max(1, cpuCount / 2);
     for (int i = 0; i < workerCount; i++) {
         String8 name;
         name.appendFormat("hwuiTask%d", i + 1);

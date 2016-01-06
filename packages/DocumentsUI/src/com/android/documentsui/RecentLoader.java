@@ -37,7 +37,6 @@ import android.util.Log;
 
 import com.android.documentsui.BaseActivity.State;
 import com.android.documentsui.model.RootInfo;
-import com.android.internal.annotations.GuardedBy;
 import com.google.android.collect.Maps;
 import com.google.common.collect.Lists;
 import com.google.common.util.concurrent.AbstractFuture;
@@ -83,7 +82,6 @@ public class RecentLoader extends AsyncTaskLoader<DirectoryResult> {
     private final RootsCache mRoots;
     private final State mState;
 
-    @GuardedBy("mTasks")
     private final HashMap<RootInfo, RecentTask> mTasks = Maps.newHashMap();
 
     private final int mSortOrder = State.SORT_ORDER_LAST_MODIFIED;
@@ -172,12 +170,6 @@ public class RecentLoader extends AsyncTaskLoader<DirectoryResult> {
 
     @Override
     public DirectoryResult loadInBackground() {
-        synchronized (mTasks) {
-            return loadInBackgroundLocked();
-        }
-    }
-
-    private DirectoryResult loadInBackgroundLocked() {
         if (mFirstPassLatch == null) {
             // First time through we kick off all the recent tasks, and wait
             // around to see if everyone finishes quickly.
@@ -315,10 +307,8 @@ public class RecentLoader extends AsyncTaskLoader<DirectoryResult> {
         // Ensure the loader is stopped
         onStopLoading();
 
-        synchronized (mTasks) {
-            for (RecentTask task : mTasks.values()) {
-                IoUtils.closeQuietly(task);
-            }
+        for (RecentTask task : mTasks.values()) {
+            IoUtils.closeQuietly(task);
         }
 
         IoUtils.closeQuietly(mResult);

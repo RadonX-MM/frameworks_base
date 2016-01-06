@@ -35,7 +35,7 @@ import java.util.Arrays;
 public class FloatingActionMode extends ActionMode {
 
     private static final int MAX_HIDE_DURATION = 3000;
-    private static final int MOVING_HIDE_DELAY = 50;
+    private static final int MOVING_HIDE_DELAY = 300;
 
     private final Context mContext;
     private final ActionMode.Callback2 mCallback;
@@ -181,6 +181,7 @@ public class FloatingActionMode extends ActionMode {
                 // Content rect is moving.
                 mOriginatingView.removeCallbacks(mMovingOff);
                 mFloatingToolbarVisibilityHelper.setMoving(true);
+                mFloatingToolbarVisibilityHelper.updateToolbarVisibility();
                 mOriginatingView.postDelayed(mMovingOff, MOVING_HIDE_DELAY);
 
                 mFloatingToolbar.setContentRect(mContentRectOnScreen);
@@ -188,9 +189,9 @@ public class FloatingActionMode extends ActionMode {
             }
         } else {
             mFloatingToolbarVisibilityHelper.setOutOfBounds(true);
+            mFloatingToolbarVisibilityHelper.updateToolbarVisibility();
             mContentRectOnScreen.setEmpty();
         }
-        mFloatingToolbarVisibilityHelper.updateToolbarVisibility();
 
         mPreviousContentRectOnScreen.set(mContentRectOnScreen);
     }

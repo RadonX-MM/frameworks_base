@@ -461,11 +461,10 @@ public class SurfaceView extends View {
         final boolean formatChanged = mFormat != mRequestedFormat;
         final boolean sizeChanged = mWidth != myWidth || mHeight != myHeight;
         final boolean visibleChanged = mVisible != mRequestedVisible;
-        final boolean layoutSizeChanged = getWidth() != mLayout.width || getHeight() != mLayout.height;
 
         if (force || creating || formatChanged || sizeChanged || visibleChanged
             || mLeft != mLocation[0] || mTop != mLocation[1]
-            || mUpdateWindowNeeded || mReportDrawNeeded || redrawNeeded || layoutSizeChanged) {
+            || mUpdateWindowNeeded || mReportDrawNeeded || redrawNeeded) {
 
             if (DEBUG) Log.i(TAG, "Changes: creating=" + creating
                     + " format=" + formatChanged + " size=" + sizeChanged

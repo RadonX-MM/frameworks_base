@@ -40,7 +40,6 @@ public abstract class KeyguardAbsKeyInputView extends LinearLayout
     protected SecurityMessageDisplay mSecurityMessageDisplay;
     protected View mEcaView;
     protected boolean mEnableHaptics;
-    private boolean mDismissing;
 
     // To avoid accidental lockout due to events while the device in in the pocket, ignore
     // any passwords with length less than or equal to this length.
@@ -68,7 +67,6 @@ public abstract class KeyguardAbsKeyInputView extends LinearLayout
     @Override
     public void reset() {
         // start fresh
-        mDismissing = false;
         resetPasswordText(false /* animate */);
         // if the user is currently locked out, enforce it.
         long deadline = mLockPatternUtils.getLockoutAttemptDeadline(
@@ -115,8 +113,6 @@ public abstract class KeyguardAbsKeyInputView extends LinearLayout
     }
 
     protected void verifyPasswordAndUnlock() {
-        if (mDismissing) return; // already verified but haven't been dismissed; don't do it again.
-
         final String entry = getPasswordText();
         setPasswordEntryInputEnabled(false);
         if (mPendingLockCheck != null) {
@@ -147,7 +143,6 @@ public abstract class KeyguardAbsKeyInputView extends LinearLayout
 
     private void onPasswordChecked(boolean matched, int timeoutMs, boolean isValidPassword) {
         if (matched) {
-            mDismissing = true;
             mCallback.reportUnlockAttempt(true, 0);
             mCallback.dismiss(true);
         } else {
@@ -237,12 +232,6 @@ public abstract class KeyguardAbsKeyInputView extends LinearLayout
                         true /* important */);
             }
         }
-    }
-
-    @Override
-    public void showMessage(String message, int color) {
-        mSecurityMessageDisplay.setNextMessageColor(color);
-        mSecurityMessageDisplay.setMessage(message, true /* important */);
     }
 
     protected abstract int getPromtReasonStringRes(int reason);

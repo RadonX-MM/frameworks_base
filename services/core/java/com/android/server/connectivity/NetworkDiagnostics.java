@@ -18,7 +18,6 @@ package com.android.server.connectivity;
 
 import static android.system.OsConstants.*;
 
-import android.net.LinkAddress;
 import android.net.LinkProperties;
 import android.net.Network;
 import android.net.NetworkUtils;
@@ -28,7 +27,6 @@ import android.system.ErrnoException;
 import android.system.Os;
 import android.system.StructTimeval;
 import android.text.TextUtils;
-import android.util.Pair;
 
 import com.android.internal.util.IndentingPrintWriter;
 
@@ -151,8 +149,6 @@ public class NetworkDiagnostics {
     }
 
     private final Map<InetAddress, Measurement> mIcmpChecks = new HashMap<>();
-    private final Map<Pair<InetAddress, InetAddress>, Measurement> mExplicitSourceIcmpChecks =
-            new HashMap<>();
     private final Map<InetAddress, Measurement> mDnsUdpChecks = new HashMap<>();
     private final String mDescription;
 
@@ -182,11 +178,7 @@ public class NetworkDiagnostics {
 
         for (RouteInfo route : mLinkProperties.getRoutes()) {
             if (route.hasGateway()) {
-                InetAddress gateway = route.getGateway();
-                prepareIcmpMeasurement(gateway);
-                if (route.isIPv6Default()) {
-                    prepareExplicitSourceIcmpMeasurements(gateway);
-                }
+                prepareIcmpMeasurement(route.getGateway());
             }
         }
         for (InetAddress nameserver : mLinkProperties.getDnsServers()) {
@@ -221,20 +213,6 @@ public class NetworkDiagnostics {
         }
     }
 
-    private void prepareExplicitSourceIcmpMeasurements(InetAddress target) {
-        for (LinkAddress l : mLinkProperties.getLinkAddresses()) {
-            InetAddress source = l.getAddress();
-            if (source instanceof Inet6Address && l.isGlobalPreferred()) {
-                Pair<InetAddress, InetAddress> srcTarget = new Pair<>(source, target);
-                if (!mExplicitSourceIcmpChecks.containsKey(srcTarget)) {
-                    Measurement measurement = new Measurement();
-                    measurement.thread = new Thread(new IcmpCheck(source, target, measurement));
-                    mExplicitSourceIcmpChecks.put(srcTarget, measurement);
-                }
-            }
-        }
-    }
-
     private void prepareDnsMeasurement(InetAddress target) {
         if (!mDnsUdpChecks.containsKey(target)) {
             Measurement measurement = new Measurement();
@@ -244,14 +222,11 @@ public class NetworkDiagnostics {
     }
 
     private int totalMeasurementCount() {
-        return mIcmpChecks.size() + mExplicitSourceIcmpChecks.size() + mDnsUdpChecks.size();
+        return mIcmpChecks.size() + mDnsUdpChecks.size();
     }
 
     private void startMeasurements() {
         for (Measurement measurement : mIcmpChecks.values()) {
-            measurement.thread.start();
-        }
-        for (Measurement measurement : mExplicitSourceIcmpChecks.values()) {
             measurement.thread.start();
         }
         for (Measurement measurement : mDnsUdpChecks.values()) {
@@ -286,10 +261,6 @@ public class NetworkDiagnostics {
                 pw.println(entry.getValue().toString());
             }
         }
-        for (Map.Entry<Pair<InetAddress, InetAddress>, Measurement> entry :
-                mExplicitSourceIcmpChecks.entrySet()) {
-            pw.println(entry.getValue().toString());
-        }
         for (Map.Entry<InetAddress, Measurement> entry : mDnsUdpChecks.entrySet()) {
             if (entry.getKey() instanceof Inet4Address) {
                 pw.println(entry.getValue().toString());
@@ -305,15 +276,13 @@ public class NetworkDiagnostics {
 
 
     private class SimpleSocketCheck implements Closeable {
-        protected final InetAddress mSource;  // Usually null.
         protected final InetAddress mTarget;
         protected final int mAddressFamily;
         protected final Measurement mMeasurement;
         protected FileDescriptor mFileDescriptor;
         protected SocketAddress mSocketAddress;
 
-        protected SimpleSocketCheck(
-                InetAddress source, InetAddress target, Measurement measurement) {
+        protected SimpleSocketCheck(InetAddress target, Measurement measurement) {
             mMeasurement = measurement;
 
             if (target instanceof Inet6Address) {
@@ -332,14 +301,6 @@ public class NetworkDiagnostics {
                 mTarget = target;
                 mAddressFamily = AF_INET;
             }
-
-            // We don't need to check the scope ID here because we currently only do explicit-source
-            // measurements from global IPv6 addresses.
-            mSource = source;
-        }
-
-        protected SimpleSocketCheck(InetAddress target, Measurement measurement) {
-            this(null, target, measurement);
         }
 
         protected void setupSocket(
@@ -353,9 +314,6 @@ public class NetworkDiagnostics {
                     SOL_SOCKET, SO_RCVTIMEO, StructTimeval.fromMillis(readTimeout));
             // TODO: Use IP_RECVERR/IPV6_RECVERR, pending OsContants availability.
             mNetwork.bindSocket(mFileDescriptor);
-            if (mSource != null) {
-                Os.bind(mFileDescriptor, mSource, 0);
-            }
             Os.connect(mFileDescriptor, mTarget, dstPort);
             mSocketAddress = Os.getsockname(mFileDescriptor);
         }
@@ -385,8 +343,8 @@ public class NetworkDiagnostics {
         private final int mProtocol;
         private final int mIcmpType;
 
-        public IcmpCheck(InetAddress source, InetAddress target, Measurement measurement) {
-            super(source, target, measurement);
+        public IcmpCheck(InetAddress target, Measurement measurement) {
+            super(target, measurement);
 
             if (mAddressFamily == AF_INET6) {
                 mProtocol = IPPROTO_ICMPV6;
@@ -399,10 +357,6 @@ public class NetworkDiagnostics {
             }
 
             mMeasurement.description += " dst{" + mTarget.getHostAddress() + "}";
-        }
-
-        public IcmpCheck(InetAddress target, Measurement measurement) {
-            this(null, target, measurement);
         }
 
         @Override

@@ -155,15 +155,6 @@ final class DisplayDeviceInfo {
      */
     public Display.Mode[] supportedModes = Display.Mode.EMPTY_ARRAY;
 
-    /** The active color transform of the display */
-    public int colorTransformId;
-
-    /** The default color transform of the display */
-    public int defaultColorTransformId;
-
-    /** The supported color transforms of the display */
-    public Display.ColorTransform[] supportedColorTransforms = Display.ColorTransform.EMPTY_ARRAY;
-
     /**
      * The nominal apparent density of the display in DPI used for layout calculations.
      * This density is sensitive to the viewing distance.  A big TV and a tablet may have
@@ -285,9 +276,6 @@ final class DisplayDeviceInfo {
                 || modeId != other.modeId
                 || defaultModeId != other.defaultModeId
                 || !Arrays.equals(supportedModes, other.supportedModes)
-                || colorTransformId != other.colorTransformId
-                || defaultColorTransformId != other.defaultColorTransformId
-                || !Arrays.equals(supportedColorTransforms, other.supportedColorTransforms)
                 || densityDpi != other.densityDpi
                 || xDpi != other.xDpi
                 || yDpi != other.yDpi
@@ -318,9 +306,6 @@ final class DisplayDeviceInfo {
         modeId = other.modeId;
         defaultModeId = other.defaultModeId;
         supportedModes = other.supportedModes;
-        colorTransformId = other.colorTransformId;
-        defaultColorTransformId = other.defaultColorTransformId;
-        supportedColorTransforms = other.supportedColorTransforms;
         densityDpi = other.densityDpi;
         xDpi = other.xDpi;
         yDpi = other.yDpi;
@@ -346,9 +331,6 @@ final class DisplayDeviceInfo {
         sb.append(", modeId ").append(modeId);
         sb.append(", defaultModeId ").append(defaultModeId);
         sb.append(", supportedModes ").append(Arrays.toString(supportedModes));
-        sb.append(", colorTransformId ").append(colorTransformId);
-        sb.append(", defaultColorTransformId ").append(defaultColorTransformId);
-        sb.append(", supportedColorTransforms ").append(Arrays.toString(supportedColorTransforms));
         sb.append(", density ").append(densityDpi);
         sb.append(", ").append(xDpi).append(" x ").append(yDpi).append(" dpi");
         sb.append(", appVsyncOff ").append(appVsyncOffsetNanos);

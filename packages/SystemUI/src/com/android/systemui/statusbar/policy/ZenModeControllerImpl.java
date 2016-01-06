@@ -121,6 +121,15 @@ public class ZenModeControllerImpl implements ZenModeController {
     }
 
     @Override
+    public void requestConditions(boolean request) {
+        mRequesting = request;
+        mNoMan.requestZenModeConditions(mListener, request ? Condition.FLAG_RELEVANT_NOW : 0);
+        if (!mRequesting) {
+            mConditions.clear();
+        }
+    }
+
+    @Override
     public ZenRule getManualRule() {
         return mConfig == null ? null : mConfig.manualRule;
     }

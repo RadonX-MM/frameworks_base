@@ -86,9 +86,6 @@ public class NotificationBackgroundView extends View {
         if (mBackground != null) {
             mBackground.setCallback(this);
         }
-        if (mBackground instanceof RippleDrawable) {
-            ((RippleDrawable) mBackground).setForceSoftware(true);
-        }
         invalidate();
     }
 

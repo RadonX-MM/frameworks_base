@@ -24,7 +24,6 @@ import android.os.SystemProperties;
 import android.view.Gravity;
 import android.view.View;
 import android.view.ViewGroup;
-import android.view.Window;
 import android.view.WindowManager;
 
 import com.android.keyguard.R;
@@ -48,15 +47,13 @@ public class StatusBarWindowManager {
     private WindowManager.LayoutParams mLpChanged;
     private int mBarHeight;
     private final boolean mKeyguardScreenRotation;
-    private final float mScreenBrightnessDoze;
+
     private final State mCurrentState = new State();
 
     public StatusBarWindowManager(Context context) {
         mContext = context;
         mWindowManager = (WindowManager) context.getSystemService(Context.WINDOW_SERVICE);
         mKeyguardScreenRotation = shouldEnableKeyguardScreenRotation();
-        mScreenBrightnessDoze = mContext.getResources().getInteger(
-                com.android.internal.R.integer.config_screenBrightnessDoze) / 255f;
     }
 
     private boolean shouldEnableKeyguardScreenRotation() {
@@ -185,7 +182,6 @@ public class StatusBarWindowManager {
         applyInputFeatures(state);
         applyFitsSystemWindows(state);
         applyModalFlag(state);
-        applyBrightness(state);
         if (mLp.copyFrom(mLpChanged) != 0) {
             mWindowManager.updateViewLayout(mStatusBarView, mLp);
         }
@@ -206,14 +202,6 @@ public class StatusBarWindowManager {
             mLpChanged.flags |= WindowManager.LayoutParams.FLAG_NOT_TOUCH_MODAL;
         } else {
             mLpChanged.flags &= ~WindowManager.LayoutParams.FLAG_NOT_TOUCH_MODAL;
-        }
-    }
-
-    private void applyBrightness(State state) {
-        if (state.forceDozeBrightness) {
-            mLpChanged.screenBrightness = mScreenBrightnessDoze;
-        } else {
-            mLpChanged.screenBrightness = WindowManager.LayoutParams.BRIGHTNESS_OVERRIDE_NONE;
         }
     }
 
@@ -291,15 +279,6 @@ public class StatusBarWindowManager {
         apply(mCurrentState);
     }
 
-    /**
-     * Set whether the screen brightness is forced to the value we use for doze mode by the status
-     * bar window.
-     */
-    public void setForceDozeBrightness(boolean forceDozeBrightness) {
-        mCurrentState.forceDozeBrightness = forceDozeBrightness;
-        apply(mCurrentState);
-    }
-
     public void dump(FileDescriptor fd, PrintWriter pw, String[] args) {
         pw.println("StatusBarWindowManager state:");
         pw.println(mCurrentState);
@@ -318,7 +297,6 @@ public class StatusBarWindowManager {
         boolean headsUpShowing;
         boolean forceStatusBarVisible;
         boolean forceCollapsed;
-        boolean forceDozeBrightness;
 
         /**
          * The {@link BaseStatusBar} state from the status bar.

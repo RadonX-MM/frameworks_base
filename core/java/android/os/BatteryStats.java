@@ -463,15 +463,12 @@ public abstract class BatteryStats implements Parcelable {
         public abstract long getCpuPowerMaUs(int which);
 
         /**
-         * Returns the approximate cpu time (in milliseconds) spent at a certain CPU speed for a
-         * given CPU cluster.
-         * @param cluster the index of the CPU cluster.
+         * Returns the approximate cpu time (in milliseconds) spent at a certain CPU speed.
          * @param step the index of the CPU speed. This is not the actual speed of the CPU.
          * @param which one of STATS_SINCE_CHARGED, STATS_SINCE_UNPLUGGED, or STATS_CURRENT.
-         * @see PowerProfile.getNumCpuClusters()
-         * @see PowerProfile.getNumSpeedStepsInCpuCluster(int)
+         * @see BatteryStats#getCpuSpeedSteps()
          */
-        public abstract long getTimeAtCpuSpeed(int cluster, int step, int which);
+        public abstract long getTimeAtCpuSpeed(int step, int which);
 
         public static abstract class Sensor {
             /*
@@ -2277,6 +2274,9 @@ public abstract class BatteryStats implements Parcelable {
     public abstract Map<String, ? extends Timer> getWakeupReasonStats();
 
     public abstract Map<String, ? extends Timer> getKernelWakelockStats();
+
+    /** Returns the number of different speeds that the CPU can run at */
+    public abstract int getCpuSpeedSteps();
 
     public abstract void writeToParcelWithoutUids(Parcel out, int flags);
 

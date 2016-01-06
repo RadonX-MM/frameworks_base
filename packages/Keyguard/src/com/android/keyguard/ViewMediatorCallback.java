@@ -28,11 +28,12 @@ public interface ViewMediatorCallback {
 
     /**
      * Report that the keyguard is done.
-     *
-     * @param strongAuth whether the user has authenticated with strong authentication like
-     *                   pattern, password or PIN but not by trust agents or fingerprint
+     * @param authenticated Whether the user securely got past the keyguard.
+     *   the only reason for this to be false is if the keyguard was instructed
+     *   to appear temporarily to verify the user is supposed to get past the
+     *   keyguard, and the user fails to do so.
      */
-    void keyguardDone(boolean strongAuth);
+    void keyguardDone(boolean authenticated);
 
     /**
      * Report that the keyguard is done drawing.
@@ -47,11 +48,8 @@ public interface ViewMediatorCallback {
 
     /**
      * Report that the keyguard is dismissable, pending the next keyguardDone call.
-     *
-     * @param strongAuth whether the user has authenticated with strong authentication like
-     *                   pattern, password or PIN but not by trust agents or fingerprint
      */
-    void keyguardDonePending(boolean strongAuth);
+    void keyguardDonePending();
 
     /**
      * Report when keyguard is actually gone
@@ -87,9 +85,8 @@ public interface ViewMediatorCallback {
     /**
      * @return one of the reasons why the bouncer needs to be shown right now and the user can't use
      *         his normal unlock method like fingerprint or trust agents. See
-     *         {@link KeyguardSecurityView#PROMPT_REASON_NONE},
-     *         {@link KeyguardSecurityView#PROMPT_REASON_RESTART} and
-     *         {@link KeyguardSecurityView#PROMPT_REASON_TIMEOUT}.
+     *         {@link KeyguardSecurityView#PROMPT_REASON_NONE}
+     *         and {@link KeyguardSecurityView#PROMPT_REASON_RESTART}.
      */
     int getBouncerPromptReason();
 }

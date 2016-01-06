@@ -127,7 +127,7 @@ public class StackScrollAlgorithm {
         mCollapseSecondCardPadding = context.getResources().getDimensionPixelSize(
                 R.dimen.notification_collapse_second_card_padding);
         mScaleDimmed = context.getResources().getDisplayMetrics().densityDpi
-                >= DisplayMetrics.DENSITY_420;
+                >= DisplayMetrics.DENSITY_XXHIGH;
     }
 
     public boolean shouldScaleDimmed() {

@@ -242,14 +242,6 @@ public class DeviceIdleController extends SystemService
             if (Intent.ACTION_BATTERY_CHANGED.equals(intent.getAction())) {
                 int plugged = intent.getIntExtra("plugged", 0);
                 updateChargingLocked(plugged != 0);
-            } else if (Intent.ACTION_PACKAGE_REMOVED.equals(intent.getAction())) {
-                if (!intent.getBooleanExtra(Intent.EXTRA_REPLACING, false)) {
-                    Uri data = intent.getData();
-                    String ssp;
-                    if (data != null && (ssp=data.getSchemeSpecificPart()) != null) {
-                        removePowerSaveWhitelistAppInternal(ssp);
-                    }
-                }
             } else if (ACTION_STEP_IDLE_STATE.equals(intent.getAction())) {
                 synchronized (DeviceIdleController.this) {
                     stepIdleStateLocked();
@@ -926,10 +918,6 @@ public class DeviceIdleController extends SystemService
                 filter.addAction(Intent.ACTION_BATTERY_CHANGED);
                 filter.addAction(ACTION_STEP_IDLE_STATE);
                 getContext().registerReceiver(mReceiver, filter);
-                filter = new IntentFilter();
-                filter.addAction(Intent.ACTION_PACKAGE_REMOVED);
-                filter.addDataScheme("package");
-                getContext().registerReceiver(mReceiver, filter);
 
                 mLocalPowerManager.setDeviceIdleWhitelist(mPowerSaveWhitelistAllAppIdArray);
 
@@ -942,10 +930,7 @@ public class DeviceIdleController extends SystemService
     public boolean addPowerSaveWhitelistAppInternal(String name) {
         synchronized (this) {
             try {
-                ApplicationInfo ai = getContext().getPackageManager().getApplicationInfo(name,
-                        PackageManager.GET_UNINSTALLED_PACKAGES
-                                | PackageManager.GET_DISABLED_COMPONENTS
-                                | PackageManager.GET_DISABLED_UNTIL_USED_COMPONENTS);
+                ApplicationInfo ai = getContext().getPackageManager().getApplicationInfo(name, 0);
                 if (mPowerSaveWhitelistUserApps.put(name, UserHandle.getAppId(ai.uid)) == null) {
                     reportPowerSaveWhitelistChangedLocked();
                     updateWhitelistAppIdsLocked();
@@ -1286,6 +1271,7 @@ public class DeviceIdleController extends SystemService
                 if (DEBUG) Slog.d(TAG, "Moved from STATE_IDLE_PENDING to STATE_SENSING.");
                 EventLogTags.writeDeviceIdle(mState, "step");
                 scheduleSensingAlarmLocked(mConstants.SENSING_TIMEOUT);
+                cancelSensingAlarmLocked();
                 cancelLocatingLocked();
                 mAnyMotionDetector.checkForAnyMotion();
                 mNotMoving = false;
@@ -1297,6 +1283,7 @@ public class DeviceIdleController extends SystemService
                 mState = STATE_LOCATING;
                 if (DEBUG) Slog.d(TAG, "Moved from STATE_SENSING to STATE_LOCATING.");
                 EventLogTags.writeDeviceIdle(mState, "step");
+                cancelSensingAlarmLocked();
                 scheduleSensingAlarmLocked(mConstants.LOCATING_TIMEOUT);
                 mLocating = true;
                 mLocationManager.requestLocationUpdates(mLocationRequest, mGenericLocationListener,
@@ -1354,7 +1341,6 @@ public class DeviceIdleController extends SystemService
             mState = STATE_ACTIVE;
             mInactiveTimeout = timeout;
             EventLogTags.writeDeviceIdle(mState, type);
-            cancelSensingAlarmLocked();
             becomeInactiveIfAppropriateLocked();
         }
     }
@@ -1538,6 +1524,7 @@ public class DeviceIdleController extends SystemService
             } catch (IOException e) {
             }
         }
+
     }
 
     private void readConfigFileLocked(XmlPullParser parser) {
@@ -1566,10 +1553,7 @@ public class DeviceIdleController extends SystemService
                     String name = parser.getAttributeValue(null, "n");
                     if (name != null) {
                         try {
-                            ApplicationInfo ai = pm.getApplicationInfo(name,
-                                    PackageManager.GET_UNINSTALLED_PACKAGES
-                                            | PackageManager.GET_DISABLED_COMPONENTS
-                                            | PackageManager.GET_DISABLED_UNTIL_USED_COMPONENTS);
+                            ApplicationInfo ai = pm.getApplicationInfo(name, 0);
                             mPowerSaveWhitelistUserApps.put(ai.packageName,
                                     UserHandle.getAppId(ai.uid));
                         } catch (PackageManager.NameNotFoundException e) {

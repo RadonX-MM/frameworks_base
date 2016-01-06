@@ -99,7 +99,7 @@ public class IntentTile extends QSTile<QSTile.State> {
         try {
             if (pi != null) {
                 if (pi.isActivity()) {
-                    getHost().startActivityDismissingKeyguard(pi);
+                    getHost().startActivityDismissingKeyguard(pi.getIntent());
                 } else {
                     pi.send();
                 }

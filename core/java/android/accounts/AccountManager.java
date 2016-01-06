@@ -615,6 +615,7 @@ public class AccountManager {
         if (features == null) throw new IllegalArgumentException("features is null");
         return new Future2Task<Boolean>(handler, callback) {
             public void doWork() throws RemoteException {
+                android.util.SeempLog.record(31);
                 mService.hasFeatures(mResponse, account, features, mContext.getOpPackageName());
             }
             public Boolean bundleToResult(Bundle bundle) throws AuthenticatorException {
@@ -667,6 +668,7 @@ public class AccountManager {
         if (type == null) throw new IllegalArgumentException("type is null");
         return new Future2Task<Account[]>(handler, callback) {
             public void doWork() throws RemoteException {
+                android.util.SeempLog.record(31);
                 mService.getAccountsByFeatures(mResponse, type, features,
                         mContext.getOpPackageName());
             }

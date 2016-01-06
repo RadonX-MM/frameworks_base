@@ -87,7 +87,6 @@ public class SoundTriggerHelper implements SoundTrigger.StatusListener {
     // This is an indirect indication of the microphone being open in some other application.
     private boolean mServiceDisabled = false;
     private boolean mStarted = false;
-    private boolean mRecognitionAborted = false;
     private PowerSaveModeListener mPowerSaveModeListener;
 
     SoundTriggerHelper(Context context) {
@@ -387,9 +386,8 @@ public class SoundTriggerHelper implements SoundTrigger.StatusListener {
 
     private void onRecognitionAbortLocked() {
         Slog.w(TAG, "Recognition aborted");
-        // If abort has been called, the hardware has already stopped recognition, so we shouldn't
-        // call it again when we process the state change.
-        mRecognitionAborted = true;
+        // No-op
+        // This is handled via service state changes instead.
     }
 
     private void onRecognitionFailureLocked() {
@@ -492,13 +490,8 @@ public class SoundTriggerHelper implements SoundTrigger.StatusListener {
             }
             return status;
         } else {
-            // Stop recognition (only if we haven't been aborted).
-            int status = STATUS_OK;
-            if (!mRecognitionAborted) {
-                status = mModule.stopRecognition(mCurrentSoundModelHandle);
-            } else {
-                mRecognitionAborted = false;
-            }
+            // Stop recognition.
+            int status = mModule.stopRecognition(mCurrentSoundModelHandle);
             if (status != SoundTrigger.STATUS_OK) {
                 Slog.w(TAG, "stopRecognition call failed with " + status);
                 if (notify) {

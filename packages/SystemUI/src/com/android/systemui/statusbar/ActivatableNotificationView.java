@@ -350,7 +350,6 @@ public abstract class ActivatableNotificationView extends ExpandableOutlineView 
         } else {
             updateBackground();
         }
-        setOutlineAlpha(dark ? 0f : 1f);
      }
 
     public void setShowingLegacyBackground(boolean showing) {

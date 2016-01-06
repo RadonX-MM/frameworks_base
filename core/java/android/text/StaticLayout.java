@@ -29,7 +29,6 @@ import android.util.Pools.SynchronizedPool;
 import com.android.internal.util.ArrayUtils;
 import com.android.internal.util.GrowingArrayUtils;
 
-import java.nio.ByteBuffer;
 import java.util.Arrays;
 import java.util.Locale;
 
@@ -342,8 +341,7 @@ public class StaticLayout extends Layout {
 
         private void setLocale(Locale locale) {
             if (!locale.equals(mLocale)) {
-                nSetLocale(mNativePtr, locale.toLanguageTag(),
-                        Hyphenator.get(locale).getNativePtr());
+                nSetLocale(mNativePtr, locale.toLanguageTag(), Hyphenator.get(locale));
                 mLocale = locale;
             }
         }
@@ -627,9 +625,7 @@ public class StaticLayout extends Layout {
 
                 chooseHt = getParagraphSpans(spanned, paraStart, paraEnd, LineHeightSpan.class);
 
-                if (chooseHt.length == 0) {
-                    chooseHt = null; // So that out() would not assume it has any contents
-                } else {
+                if (chooseHt.length != 0) {
                     if (chooseHtv == null ||
                         chooseHtv.length < chooseHt.length) {
                         chooseHtv = ArrayUtils.newUnpaddedIntArray(chooseHt.length);
@@ -812,7 +808,7 @@ public class StaticLayout extends Layout {
 
                     v = out(source, here, endPos,
                             fmAscent, fmDescent, fmTop, fmBottom,
-                            v, spacingmult, spacingadd, chooseHt, chooseHtv, fm, flags[breakIndex],
+                            v, spacingmult, spacingadd, chooseHt,chooseHtv, fm, flags[breakIndex],
                             needMultiply, chdirs, dir, easy, bufEnd, includepad, trackpad,
                             chs, widths, paraStart, ellipsize, ellipsizedWidth,
                             lineWidths[breakIndex], paint, moreChars);
@@ -1247,7 +1243,7 @@ public class StaticLayout extends Layout {
     private static native void nFreeBuilder(long nativePtr);
     private static native void nFinishBuilder(long nativePtr);
 
-    /* package */ static native long nLoadHyphenator(ByteBuffer buf, int offset);
+    /* package */ static native long nLoadHyphenator(String patternData);
 
     private static native void nSetLocale(long nativePtr, String locale, long nativeHyphenator);
 

@@ -477,7 +477,7 @@ public class ZygoteInit {
                         classPathElement, "*", instructionSet, false /* defer */);
                 if (dexoptNeeded != DexFile.NO_DEXOPT_NEEDED) {
                     installer.dexopt(classPathElement, Process.SYSTEM_UID, false,
-                            instructionSet, dexoptNeeded, false /* boot complete */);
+                            instructionSet, dexoptNeeded);
                 }
             }
         } catch (IOException ioe) {

@@ -666,9 +666,7 @@ template <class T>
 void RenderNode::issueDrawShadowOperation(const Matrix4& transformFromParent, T& handler) {
     if (properties().getAlpha() <= 0.0f
             || properties().getOutline().getAlpha() <= 0.0f
-            || !properties().getOutline().getPath()
-            || properties().getScaleX() == 0
-            || properties().getScaleY() == 0) {
+            || !properties().getOutline().getPath()) {
         // no shadow to draw
         return;
     }
@@ -858,10 +856,7 @@ void RenderNode::issueOperations(OpenGLRenderer& renderer, T& handler) {
     const bool useViewProperties = (!mLayer || drawLayer);
     if (useViewProperties) {
         const Outline& outline = properties().getOutline();
-        if (properties().getAlpha() <= 0
-                || (outline.getShouldClip() && outline.isEmpty())
-                || properties().getScaleX() == 0
-                || properties().getScaleY() == 0) {
+        if (properties().getAlpha() <= 0 || (outline.getShouldClip() && outline.isEmpty())) {
             DISPLAY_LIST_LOGD("%*sRejected display list (%p, %s)", handler.level() * 2, "",
                     this, getName());
             return;

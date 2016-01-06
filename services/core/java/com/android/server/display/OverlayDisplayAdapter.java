@@ -310,7 +310,7 @@ final class OverlayDisplayAdapter extends DisplayAdapter {
         }
 
         @Override
-        public void requestColorTransformAndModeInTransactionLocked(int color, int id) {
+        public void requestModeInTransactionLocked(int id) {
             int index = -1;
             if (id == 0) {
                 // Use the default.

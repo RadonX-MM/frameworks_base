@@ -21,7 +21,6 @@ import android.media.AudioAttributes;
 import android.media.AudioManager;
 import android.media.MediaPlayer;
 import android.media.MediaPlayer.OnCompletionListener;
-import android.media.MediaPlayer.OnErrorListener;
 import android.net.Uri;
 import android.os.Looper;
 import android.os.PowerManager;
@@ -37,7 +36,7 @@ import java.util.LinkedList;
  * - whenever audio is played, audio focus is requested,
  * - whenever audio playback is stopped or the playback completed, audio focus is abandoned.
  */
-public class NotificationPlayer implements OnCompletionListener, OnErrorListener {
+public class NotificationPlayer implements OnCompletionListener {
     private static final int PLAY = 1;
     private static final int STOP = 2;
     private static final boolean mDebug = false;
@@ -113,7 +112,6 @@ public class NotificationPlayer implements OnCompletionListener, OnErrorListener
                     //  done playing. This class should be modified to use a single thread, on which
                     //  command are issued, and on which it receives the completion callbacks.
                     player.setOnCompletionListener(NotificationPlayer.this);
-                    player.setOnErrorListener(NotificationPlayer.this);
                     player.start();
                     if (mPlayer != null) {
                         mPlayer.release();
@@ -245,13 +243,6 @@ public class NotificationPlayer implements OnCompletionListener, OnErrorListener
                 }
             }
         }
-    }
-
-    public boolean onError(MediaPlayer mp, int what, int extra) {
-        Log.e(mTag, "error " + what + " (extra=" + extra + ") playing notification");
-        // error happened, handle it just like a completion
-        onCompletion(mp);
-        return true;
     }
 
     private String mTag;

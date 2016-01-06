@@ -3799,6 +3799,7 @@ public class AccountManagerService
         boolean isPermitted =
                 isPermitted(opPackageName, callingUid, Manifest.permission.GET_ACCOUNTS,
                         Manifest.permission.GET_ACCOUNTS_PRIVILEGED);
+        Log.i(TAG, String.format("getTypesVisibleToCaller: isPermitted? %s", isPermitted));
         return getTypesForCaller(callingUid, userId, isPermitted);
     }
 

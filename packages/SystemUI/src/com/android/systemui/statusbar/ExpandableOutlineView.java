@@ -34,7 +34,6 @@ public abstract class ExpandableOutlineView extends ExpandableView {
     private final Rect mOutlineRect = new Rect();
     protected final int mRoundedRectCornerRadius;
     private boolean mCustomOutline;
-    private float mOutlineAlpha = 1f;
 
     public ExpandableOutlineView(Context context, AttributeSet attrs) {
         super(context, attrs);
@@ -51,7 +50,6 @@ public abstract class ExpandableOutlineView extends ExpandableView {
                 } else {
                     outline.setRoundRect(mOutlineRect, mRoundedRectCornerRadius);
                 }
-                outline.setAlpha(mOutlineAlpha);
             }
         });
     }
@@ -65,11 +63,6 @@ public abstract class ExpandableOutlineView extends ExpandableView {
     @Override
     public void setClipTopAmount(int clipTopAmount) {
         super.setClipTopAmount(clipTopAmount);
-        invalidateOutline();
-    }
-
-    protected void setOutlineAlpha(float alpha) {
-        mOutlineAlpha = alpha;
         invalidateOutline();
     }
 

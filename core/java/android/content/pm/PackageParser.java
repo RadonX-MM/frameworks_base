@@ -894,7 +894,6 @@ public class PackageParser {
             }
 
             pkg.volumeUuid = volumeUuid;
-            pkg.applicationInfo.volumeUuid = volumeUuid;
             pkg.baseCodePath = apkPath;
             pkg.mSignatures = null;
 
@@ -4519,17 +4518,6 @@ public class PackageParser {
          */
         public boolean isUpdatedSystemApp() {
             return applicationInfo.isUpdatedSystemApp();
-        }
-
-        /**
-         * @hide
-         */
-        public boolean canHaveOatDir() {
-            // The following app types CANNOT have oat directory
-            // - non-updated system apps
-            // - forward-locked apps or apps installed in ASEC containers
-            return (!isSystemApp() || isUpdatedSystemApp())
-                    && !isForwardLocked() && !applicationInfo.isExternalAsec();
         }
 
         public String toString() {

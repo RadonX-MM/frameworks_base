@@ -490,7 +490,6 @@ public class SurfaceControl {
         public boolean secure;
         public long appVsyncOffsetNanos;
         public long presentationDeadlineNanos;
-        public int colorTransform;
 
         public PhysicalDisplayInfo() {
         }
@@ -514,8 +513,7 @@ public class SurfaceControl {
                     && yDpi == other.yDpi
                     && secure == other.secure
                     && appVsyncOffsetNanos == other.appVsyncOffsetNanos
-                    && presentationDeadlineNanos == other.presentationDeadlineNanos
-                    && colorTransform == other.colorTransform;
+                    && presentationDeadlineNanos == other.presentationDeadlineNanos;
         }
 
         @Override
@@ -533,7 +531,6 @@ public class SurfaceControl {
             secure = other.secure;
             appVsyncOffsetNanos = other.appVsyncOffsetNanos;
             presentationDeadlineNanos = other.presentationDeadlineNanos;
-            colorTransform = other.colorTransform;
         }
 
         // For debugging purposes
@@ -542,8 +539,7 @@ public class SurfaceControl {
             return "PhysicalDisplayInfo{" + width + " x " + height + ", " + refreshRate + " fps, "
                     + "density " + density + ", " + xDpi + " x " + yDpi + " dpi, secure " + secure
                     + ", appVsyncOffset " + appVsyncOffsetNanos
-                    + ", bufferDeadline " + presentationDeadlineNanos
-                    + ", colorTransform " + colorTransform + "}";
+                    + ", bufferDeadline " + presentationDeadlineNanos + "}";
         }
     }
 

@@ -18,7 +18,6 @@ package com.android.server;
 
 import android.app.admin.DevicePolicyManager;
 import android.app.backup.BackupManager;
-import android.app.trust.IStrongAuthTracker;
 import android.content.BroadcastReceiver;
 import android.content.ContentResolver;
 import android.content.Context;
@@ -29,8 +28,6 @@ import android.content.pm.UserInfo;
 import static android.Manifest.permission.ACCESS_KEYGUARD_SECURE_STORAGE;
 import static android.content.Context.USER_SERVICE;
 import static android.Manifest.permission.READ_CONTACTS;
-import static com.android.internal.widget.LockPatternUtils.StrongAuthTracker.STRONG_AUTH_REQUIRED_AFTER_LOCKOUT;
-
 import android.database.sqlite.SQLiteDatabase;
 import android.os.Binder;
 import android.os.IBinder;
@@ -78,7 +75,6 @@ public class LockSettingsService extends ILockSettings.Stub {
     private final Context mContext;
 
     private final LockSettingsStorage mStorage;
-    private final LockSettingsStrongAuth mStrongAuth = new LockSettingsStrongAuth();
 
     private LockPatternUtils mLockPatternUtils;
     private boolean mFirstCallToVold;
@@ -103,7 +99,6 @@ public class LockSettingsService extends ILockSettings.Stub {
         filter.addAction(Intent.ACTION_USER_ADDED);
         filter.addAction(Intent.ACTION_USER_STARTING);
         filter.addAction(Intent.ACTION_USER_REMOVED);
-        filter.addAction(Intent.ACTION_USER_PRESENT);
         mContext.registerReceiverAsUser(mBroadcastReceiver, UserHandle.ALL, filter, null, null);
 
         mStorage = new LockSettingsStorage(context, new LockSettingsStorage.Callback() {
@@ -133,8 +128,6 @@ public class LockSettingsService extends ILockSettings.Stub {
             } else if (Intent.ACTION_USER_STARTING.equals(intent.getAction())) {
                 final int userHandle = intent.getIntExtra(Intent.EXTRA_USER_HANDLE, 0);
                 mStorage.prefetchUser(userHandle);
-            } else if (Intent.ACTION_USER_PRESENT.equals(intent.getAction())) {
-                mStrongAuth.reportUnlock(getSendingUserId());
             } else if (Intent.ACTION_USER_REMOVED.equals(intent.getAction())) {
                 final int userHandle = intent.getIntExtra(Intent.EXTRA_USER_HANDLE, 0);
                 if (userHandle > 0) {
@@ -696,10 +689,6 @@ public class LockSettingsService extends ILockSettings.Stub {
             if (shouldReEnroll) {
                 credentialUtil.setCredential(credential, credential, userId);
             }
-        } else if (response.getResponseCode() == VerifyCredentialResponse.RESPONSE_RETRY) {
-            if (response.getTimeout() > 0) {
-                requireStrongAuth(STRONG_AUTH_REQUIRED_AFTER_LOCKOUT, userId);
-            }
         }
 
         return response;
@@ -754,7 +743,6 @@ public class LockSettingsService extends ILockSettings.Stub {
 
     private void removeUser(int userId) {
         mStorage.removeUser(userId);
-        mStrongAuth.removeUser(userId);
 
         final KeyStore ks = KeyStore.getInstance();
         ks.onUserRemoved(userId);
@@ -767,24 +755,6 @@ public class LockSettingsService extends ILockSettings.Stub {
         } catch (RemoteException ex) {
             Slog.w(TAG, "unable to clear GK secure user id");
         }
-    }
-
-    @Override
-    public void registerStrongAuthTracker(IStrongAuthTracker tracker) {
-        checkPasswordReadPermission(UserHandle.USER_ALL);
-        mStrongAuth.registerStrongAuthTracker(tracker);
-    }
-
-    @Override
-    public void unregisterStrongAuthTracker(IStrongAuthTracker tracker) {
-        checkPasswordReadPermission(UserHandle.USER_ALL);
-        mStrongAuth.unregisterStrongAuthTracker(tracker);
-    }
-
-    @Override
-    public void requireStrongAuth(int strongAuthReason, int userId) {
-        checkWritePermission(userId);
-        mStrongAuth.requireStrongAuth(strongAuthReason, userId);
     }
 
     private static final String[] VALID_SETTINGS = new String[] {
@@ -857,4 +827,5 @@ public class LockSettingsService extends ILockSettings.Stub {
         Slog.e(TAG, "Unable to acquire GateKeeperService");
         return null;
     }
+
 }

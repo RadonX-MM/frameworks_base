@@ -332,25 +332,9 @@ public class SubscriptionInfo implements Parcelable {
         return 0;
     }
 
-    /**
-     * @hide
-     */
-    public static String givePrintableIccid(String iccId) {
-        String iccIdToPrint = null;
-        if (iccId != null) {
-            if (iccId.length() > 9) {
-                iccIdToPrint = iccId.substring(0, 9) + "XXXXXXXXXXX";
-            } else {
-                iccIdToPrint = iccId;
-            }
-        }
-        return iccIdToPrint;
-    }
-
     @Override
     public String toString() {
-        String iccIdToPrint = givePrintableIccid(mIccId);
-        return "{id=" + mId + ", iccId=" + iccIdToPrint + " simSlotIndex=" + mSimSlotIndex
+        return "{id=" + mId + ", iccId=" + mIccId + " simSlotIndex=" + mSimSlotIndex
                 + " displayName=" + mDisplayName + " carrierName=" + mCarrierName
                 + " nameSource=" + mNameSource + " iconTint=" + mIconTint
                 + " dataRoaming=" + mDataRoaming + " iconBitmap=" + mIconBitmap + " mcc " + mMcc

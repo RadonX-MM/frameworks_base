@@ -217,8 +217,6 @@ public abstract class WindowOrientationListener {
      * It is called each time the orientation determination transitions from being
      * uncertain to being certain again, even if it is the same orientation as before.
      *
-     * This should only be called on the Handler thread.
-     *
      * @param rotation The new orientation of the device, one of the Surface.ROTATION_* constants.
      * @see android.view.Surface
      */
@@ -997,13 +995,9 @@ public abstract class WindowOrientationListener {
 
         @Override
         public void onSensorChanged(SensorEvent event) {
-            int newRotation;
             synchronized (mLock) {
                 mDesiredRotation = (int) event.values[0];
-                newRotation = evaluateRotationChangeLocked();
-            }
-            if (newRotation >=0) {
-                onProposedRotationChanged(newRotation);
+                evaluateRotationChangeLocked();
             }
         }
 
@@ -1029,19 +1023,18 @@ public abstract class WindowOrientationListener {
             unscheduleRotationEvaluationLocked();
         }
 
-        public int evaluateRotationChangeLocked() {
+        public void evaluateRotationChangeLocked() {
             unscheduleRotationEvaluationLocked();
             if (mDesiredRotation == mProposedRotation) {
-                return -1;
+                return;
             }
             final long now = SystemClock.elapsedRealtimeNanos();
             if (isDesiredRotationAcceptableLocked(now)) {
                 mProposedRotation = mDesiredRotation;
-                return mProposedRotation;
+                onProposedRotationChanged(mProposedRotation);
             } else {
                 scheduleRotationEvaluationIfNecessaryLocked(now);
             }
-            return -1;
         }
 
         private boolean isDesiredRotationAcceptableLocked(long now) {
@@ -1097,13 +1090,9 @@ public abstract class WindowOrientationListener {
         private Runnable mRotationEvaluator = new Runnable() {
             @Override
             public void run() {
-                int newRotation;
                 synchronized (mLock) {
                     mRotationEvaluationScheduled = false;
-                    newRotation = evaluateRotationChangeLocked();
-                }
-                if (newRotation >= 0) {
-                    onProposedRotationChanged(newRotation);
+                    evaluateRotationChangeLocked();
                 }
             }
         };

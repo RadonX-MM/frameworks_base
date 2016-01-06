@@ -22,6 +22,7 @@ import android.animation.PropertyValuesHolder;
 import android.animation.ValueAnimator;
 import android.content.Context;
 import android.graphics.Color;
+import android.util.Log;
 import android.view.View;
 import android.view.ViewTreeObserver;
 import android.view.animation.DecelerateInterpolator;
@@ -43,15 +44,12 @@ import com.android.systemui.statusbar.stack.StackStateAnimator;
 public class ScrimController implements ViewTreeObserver.OnPreDrawListener,
         HeadsUpManager.OnHeadsUpChangedListener {
     public static final long ANIMATION_DURATION = 220;
-    public static final Interpolator KEYGUARD_FADE_OUT_INTERPOLATOR
-            = new PathInterpolator(0f, 0, 0.7f, 1f);
 
     private static final float SCRIM_BEHIND_ALPHA = 0.62f;
     private static final float SCRIM_BEHIND_ALPHA_KEYGUARD = 0.45f;
     private static final float SCRIM_BEHIND_ALPHA_UNLOCKING = 0.2f;
     private static final float SCRIM_IN_FRONT_ALPHA = 0.75f;
     private static final int TAG_KEY_ANIM = R.id.scrim;
-    private static final int TAG_KEY_ANIM_TARGET = R.id.scrim_target;
     private static final int TAG_HUN_START_ALPHA = R.id.hun_scrim_alpha_start;
     private static final int TAG_HUN_END_ALPHA = R.id.hun_scrim_alpha_end;
 
@@ -73,7 +71,9 @@ public class ScrimController implements ViewTreeObserver.OnPreDrawListener,
     private long mDurationOverride = -1;
     private long mAnimationDelay;
     private Runnable mOnAnimationFinished;
+    private boolean mAnimationStarted;
     private final Interpolator mInterpolator = new DecelerateInterpolator();
+    private final Interpolator mKeyguardFadeOutInterpolator = new PathInterpolator(0f, 0, 0.7f, 1f);
     private BackDropView mBackDropView;
     private boolean mScrimSrcEnabled;
     private boolean mDozing;
@@ -86,8 +86,6 @@ public class ScrimController implements ViewTreeObserver.OnPreDrawListener,
     private float mTopHeadsUpDragAmount;
     private View mDraggedHeadsUpView;
     private boolean mForceHideScrims;
-    private boolean mSkipFirstFrame;
-    private boolean mDontAnimateBouncerChanges;
 
     public ScrimController(ScrimView scrimBehind, ScrimView scrimInFront, View headsUpScrim,
             boolean scrimSrcEnabled) {
@@ -126,7 +124,7 @@ public class ScrimController implements ViewTreeObserver.OnPreDrawListener,
 
     public void setBouncerShowing(boolean showing) {
         mBouncerShowing = showing;
-        mAnimateChange = !mExpanding && !mDontAnimateBouncerChanges;
+        mAnimateChange = !mExpanding;
         scheduleUpdate();
     }
 
@@ -135,25 +133,19 @@ public class ScrimController implements ViewTreeObserver.OnPreDrawListener,
         scheduleUpdate();
     }
 
-    public void animateKeyguardFadingOut(long delay, long duration, Runnable onAnimationFinished,
-            boolean skipFirstFrame) {
+    public void animateKeyguardFadingOut(long delay, long duration, Runnable onAnimationFinished) {
         mWakeAndUnlocking = false;
         mAnimateKeyguardFadingOut = true;
         mDurationOverride = duration;
         mAnimationDelay = delay;
         mAnimateChange = true;
-        mSkipFirstFrame = skipFirstFrame;
         mOnAnimationFinished = onAnimationFinished;
         scheduleUpdate();
-
-        // No need to wait for the next frame to be drawn for this case - onPreDraw will execute
-        // the changes we just scheduled.
-        onPreDraw();
     }
 
     public void abortKeyguardFadingOut() {
         if (mAnimateKeyguardFadingOut) {
-            endAnimateKeyguardFadingOut(true /* force */);
+            endAnimateKeyguardFadingOut();
         }
     }
 
@@ -206,13 +198,8 @@ public class ScrimController implements ViewTreeObserver.OnPreDrawListener,
 
             // During wake and unlock, we first hide everything behind a black scrim, which then
             // gets faded out from animateKeyguardFadingOut.
-            if (mDozing) {
-                setScrimInFrontColor(0f);
-                setScrimBehindColor(1f);
-            } else {
-                setScrimInFrontColor(1f);
-                setScrimBehindColor(0f);
-            }
+            setScrimInFrontColor(1f);
+            setScrimBehindColor(0f);
         } else if (!mKeyguardShowing && !mBouncerShowing) {
             updateScrimNormal();
             setScrimInFrontColor(0);
@@ -271,14 +258,10 @@ public class ScrimController implements ViewTreeObserver.OnPreDrawListener,
     }
 
     private void setScrimColor(View scrim, float alpha) {
-        ValueAnimator runningAnim = (ValueAnimator) scrim.getTag(TAG_KEY_ANIM);
-        Float target = (Float) scrim.getTag(TAG_KEY_ANIM_TARGET);
-        if (runningAnim != null && target != null) {
-            if (alpha != target) {
-                runningAnim.cancel();
-            } else {
-                return;
-            }
+        Object runningAnim = scrim.getTag(TAG_KEY_ANIM);
+        if (runningAnim instanceof ValueAnimator) {
+            ((ValueAnimator) runningAnim).cancel();
+            scrim.setTag(TAG_KEY_ANIM, null);
         }
         if (mAnimateChange) {
             startScrimAnimation(scrim, alpha);
@@ -342,49 +325,37 @@ public class ScrimController implements ViewTreeObserver.OnPreDrawListener,
                     mOnAnimationFinished = null;
                 }
                 scrim.setTag(TAG_KEY_ANIM, null);
-                scrim.setTag(TAG_KEY_ANIM_TARGET, null);
             }
         });
         anim.start();
-        if (mSkipFirstFrame) {
-            anim.setCurrentPlayTime(16);
-        }
         scrim.setTag(TAG_KEY_ANIM, anim);
-        scrim.setTag(TAG_KEY_ANIM_TARGET, target);
+        mAnimationStarted = true;
     }
 
     private Interpolator getInterpolator() {
-        return mAnimateKeyguardFadingOut ? KEYGUARD_FADE_OUT_INTERPOLATOR : mInterpolator;
+        return mAnimateKeyguardFadingOut ? mKeyguardFadeOutInterpolator : mInterpolator;
     }
 
     @Override
     public boolean onPreDraw() {
         mScrimBehind.getViewTreeObserver().removeOnPreDrawListener(this);
         mUpdatePending = false;
-        if (mDontAnimateBouncerChanges) {
-            mDontAnimateBouncerChanges = false;
-        }
         updateScrims();
         mDurationOverride = -1;
         mAnimationDelay = 0;
-        mSkipFirstFrame = false;
 
         // Make sure that we always call the listener even if we didn't start an animation.
-        endAnimateKeyguardFadingOut(false /* force */);
+        endAnimateKeyguardFadingOut();
+        mAnimationStarted = false;
         return true;
     }
 
-    private void endAnimateKeyguardFadingOut(boolean force) {
+    private void endAnimateKeyguardFadingOut() {
         mAnimateKeyguardFadingOut = false;
-        if ((force || (!isAnimating(mScrimInFront) && !isAnimating(mScrimBehind)))
-                && mOnAnimationFinished != null) {
+        if (!mAnimationStarted && mOnAnimationFinished != null) {
             mOnAnimationFinished.run();
             mOnAnimationFinished = null;
         }
-    }
-
-    private boolean isAnimating(View scrim) {
-        return scrim.getTag(TAG_KEY_ANIM) != null;
     }
 
     public void setBackDropView(BackDropView backDropView) {
@@ -499,9 +470,5 @@ public class ScrimController implements ViewTreeObserver.OnPreDrawListener,
         mForceHideScrims = hide;
         mAnimateChange = false;
         scheduleUpdate();
-    }
-
-    public void dontAnimateBouncerChangesUntilNextFrame() {
-        mDontAnimateBouncerChanges = true;
     }
 }

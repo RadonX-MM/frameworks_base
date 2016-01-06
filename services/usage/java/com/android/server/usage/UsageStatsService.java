@@ -314,8 +314,6 @@ public class UsageStatsService extends SystemService implements
                 mAppIdleParoled = paroled;
                 if (DEBUG) Slog.d(TAG, "Changing paroled to " + mAppIdleParoled);
                 if (paroled) {
-                    postParoleEndTimeout();
-                } else {
                     mLastAppIdleParoledTime = checkAndGetTimeLocked();
                     postNextParoleTimeout();
                 }
@@ -385,11 +383,9 @@ public class UsageStatsService extends SystemService implements
                         timeNow);
                 final int packageCount = packages.size();
                 for (int p = 0; p < packageCount; p++) {
-                    final PackageInfo pi = packages.get(p);
-                    final String packageName = pi.packageName;
-                    final boolean isIdle = isAppIdleFiltered(packageName,
-                            UserHandle.getAppId(pi.applicationInfo.uid),
-                            userId, service, timeNow, screenOnTime);
+                    final String packageName = packages.get(p).packageName;
+                    final boolean isIdle = isAppIdleFiltered(packageName, userId, service, timeNow,
+                            screenOnTime);
                     mHandler.sendMessage(mHandler.obtainMessage(MSG_INFORM_LISTENERS,
                             userId, isIdle ? 1 : 0, packageName));
                     mAppIdleHistory.addEntry(packageName, userId, isIdle, timeNow);
@@ -408,6 +404,8 @@ public class UsageStatsService extends SystemService implements
                 if (timeSinceLastParole > mAppIdleParoleIntervalMillis) {
                     if (DEBUG) Slog.d(TAG, "Crossed default parole interval");
                     setAppIdleParoled(true);
+                    // Make sure it ends at some point
+                    postParoleEndTimeout();
                 } else {
                     if (DEBUG) Slog.d(TAG, "Not long enough to go to parole");
                     postNextParoleTimeout();
@@ -494,6 +492,7 @@ public class UsageStatsService extends SystemService implements
             if (!deviceIdle
                     && timeSinceLastParole >= mAppIdleParoleIntervalMillis) {
                 if (DEBUG) Slog.i(TAG, "Bringing idle apps out of inactive state due to deviceIdleMode=false");
+                postNextParoleTimeout();
                 setAppIdleParoled(true);
             } else if (deviceIdle) {
                 if (DEBUG) Slog.i(TAG, "Device idle, back to prison");
@@ -771,17 +770,10 @@ public class UsageStatsService extends SystemService implements
         if (mAppIdleParoled) {
             return false;
         }
-        try {
-            ApplicationInfo ai = getContext().getPackageManager().getApplicationInfo(packageName,
-                    PackageManager.GET_UNINSTALLED_PACKAGES
-                            | PackageManager.GET_DISABLED_COMPONENTS);
-            return isAppIdleFiltered(packageName, ai.uid, userId, timeNow);
-        } catch (PackageManager.NameNotFoundException e) {
-        }
-        return false;
+        return isAppIdleFiltered(packageName, userId, timeNow);
     }
 
-    boolean isAppIdleFiltered(String packageName, int uidForAppId, int userId, long timeNow) {
+    boolean isAppIdleFiltered(String packageName, int userId, long timeNow) {
         final UserUsageStatsService userService;
         final long screenOnTime;
         synchronized (mLock) {
@@ -791,8 +783,7 @@ public class UsageStatsService extends SystemService implements
             userService = getUserDataAndInitializeIfNeededLocked(userId, timeNow);
             screenOnTime = getScreenOnTimeLocked(timeNow);
         }
-        return isAppIdleFiltered(packageName, UserHandle.getAppId(uidForAppId), userId,
-                userService, timeNow, screenOnTime);
+        return isAppIdleFiltered(packageName, userId, userService, timeNow, screenOnTime);
     }
 
     /**
@@ -801,22 +792,14 @@ public class UsageStatsService extends SystemService implements
      * This happens if the device is plugged in or temporarily allowed to make exceptions.
      * Called by interface impls.
      */
-    private boolean isAppIdleFiltered(String packageName, int appId, int userId,
+    private boolean isAppIdleFiltered(String packageName, int userId,
             UserUsageStatsService userService, long timeNow, long screenOnTime) {
         if (packageName == null) return false;
         // If not enabled at all, of course nobody is ever idle.
         if (!mAppIdleEnabled) {
             return false;
         }
-        if (appId < Process.FIRST_APPLICATION_UID) {
-            // System uids never go idle.
-            return false;
-        }
-        if (packageName.equals("android")) {
-            // Nor does the framework (which should be redundant with the above, but for MR1 we will
-            // retain this for safety).
-            return false;
-        }
+        if (packageName.equals("android")) return false;
         try {
             // We allow all whitelisted apps, including those that don't want to be whitelisted
             // for idle mode, because app idle (aka app standby) is really not as big an issue
@@ -883,8 +866,8 @@ public class UsageStatsService extends SystemService implements
             ApplicationInfo ai = apps.get(i);
 
             // Check whether this app is idle.
-            boolean idle = isAppIdleFiltered(ai.packageName, UserHandle.getAppId(ai.uid),
-                    userId, userService, timeNow, screenOnTime);
+            boolean idle = isAppIdleFiltered(ai.packageName, userId, userService, timeNow,
+                    screenOnTime);
 
             int index = uidStates.indexOfKey(ai.uid);
             if (index < 0) {
@@ -1370,8 +1353,8 @@ public class UsageStatsService extends SystemService implements
         }
 
         @Override
-        public boolean isAppIdle(String packageName, int uidForAppId, int userId) {
-            return UsageStatsService.this.isAppIdleFiltered(packageName, uidForAppId, userId, -1);
+        public boolean isAppIdle(String packageName, int userId) {
+            return UsageStatsService.this.isAppIdleFiltered(packageName, userId, -1);
         }
 
         @Override

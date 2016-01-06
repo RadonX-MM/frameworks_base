@@ -26,7 +26,6 @@ import android.os.AsyncTask;
 import android.provider.Settings;
 import android.text.TextUtils;
 import android.util.Slog;
-import android.view.View.OnAttachStateChangeListener;
 import android.widget.AbsListView;
 import com.android.internal.R;
 import com.android.internal.content.PackageMonitor;
@@ -103,8 +102,6 @@ public class ResolverActivity extends Activity {
     private final ArrayList<Intent> mIntents = new ArrayList<>();
     private ResolverComparator mResolverComparator;
     private PickTargetOptionRequest mPickOptionRequest;
-
-    protected ResolverDrawerLayout mResolverDrawerLayout;
 
     private boolean mRegistered;
     private final PackageMonitor mPackageMonitor = new PackageMonitor() {
@@ -237,9 +234,7 @@ public class ResolverActivity extends Activity {
 
         mResolverComparator = new ResolverComparator(this, getTargetIntent(), referrerPackage);
 
-        if (configureContentView(mIntents, initialIntents, rList, alwaysUseOption)) {
-            return;
-        }
+        configureContentView(mIntents, initialIntents, rList, alwaysUseOption);
 
         // Prevent the Resolver window from becoming the top fullscreen window and thus from taking
         // control of the system bars.
@@ -256,7 +251,6 @@ public class ResolverActivity extends Activity {
             if (isVoiceInteraction()) {
                 rdl.setCollapsed(false);
             }
-            mResolverDrawerLayout = rdl;
         }
 
         if (title == null) {
@@ -332,18 +326,6 @@ public class ResolverActivity extends Activity {
         if (isVoiceInteraction()) {
             onSetupVoiceInteraction();
         }
-
-        getWindow().getDecorView().addOnAttachStateChangeListener(
-                new OnAttachStateChangeListener() {
-            @Override
-            public void onViewAttachedToWindow(View v) {
-                v.getViewRootImpl().setDrawDuringWindowsAnimating(true);
-            }
-
-            @Override
-            public void onViewDetachedFromWindow(View v) {
-            }
-        });
     }
 
     /**
@@ -812,10 +794,6 @@ public class ResolverActivity extends Activity {
         return false;
     }
 
-    boolean shouldAutoLaunchSingleChoice(TargetInfo target) {
-        return true;
-    }
-
     void showAppDetails(ResolveInfo ri) {
         Intent in = new Intent().setAction(Settings.ACTION_APPLICATION_DETAILS_SETTINGS)
                 .setData(Uri.fromParts("package", ri.activityInfo.packageName, null))
@@ -830,10 +808,7 @@ public class ResolverActivity extends Activity {
                 launchedFromUid, filterLastUsed);
     }
 
-    /**
-     * Returns true if the activity is finishing and creation should halt
-     */
-    boolean configureContentView(List<Intent> payloadIntents, Intent[] initialIntents,
+    void configureContentView(List<Intent> payloadIntents, Intent[] initialIntents,
             List<ResolveInfo> rList, boolean alwaysUseOption) {
         // The last argument of createAdapter is whether to do special handling
         // of the last used choice to highlight it in the list.  We need to always
@@ -853,21 +828,16 @@ public class ResolverActivity extends Activity {
         mAlwaysUseOption = alwaysUseOption;
 
         int count = mAdapter.getUnfilteredCount();
-        if (count == 1 && mAdapter.getOtherProfile() == null) {
-            // Only one target, so we're a candidate to auto-launch!
-            final TargetInfo target = mAdapter.targetInfoForPosition(0, false);
-            if (shouldAutoLaunchSingleChoice(target)) {
-                safelyStartActivity(target);
-                mPackageMonitor.unregister();
-                mRegistered = false;
-                finish();
-                return true;
-            }
-        }
-        if (count > 0) {
+        if (count > 1 || (count == 1 && mAdapter.getOtherProfile() != null)) {
             setContentView(layoutId);
             mAdapterView = (AbsListView) findViewById(R.id.resolver_list);
             onPrepareAdapterView(mAdapterView, mAdapter, alwaysUseOption);
+        } else if (count == 1) {
+            safelyStartActivity(mAdapter.targetInfoForPosition(0, false));
+            mPackageMonitor.unregister();
+            mRegistered = false;
+            finish();
+            return;
         } else {
             setContentView(R.layout.resolver_list);
 
@@ -877,7 +847,6 @@ public class ResolverActivity extends Activity {
             mAdapterView = (AbsListView) findViewById(R.id.resolver_list);
             mAdapterView.setVisibility(View.GONE);
         }
-        return false;
     }
 
     void onPrepareAdapterView(AbsListView adapterView, ResolveListAdapter adapter,
@@ -915,7 +884,6 @@ public class ResolverActivity extends Activity {
         private final ResolveInfo mResolveInfo;
         private final CharSequence mDisplayLabel;
         private Drawable mDisplayIcon;
-        private Drawable mBadge;
         private final CharSequence mExtendedInfo;
         private final Intent mResolvedIntent;
         private final List<Intent> mSourceIntents = new ArrayList<>();
@@ -960,25 +928,7 @@ public class ResolverActivity extends Activity {
         }
 
         public Drawable getBadgeIcon() {
-            // We only expose a badge if we have extended info.
-            // The badge is a higher-priority disambiguation signal
-            // but we don't need one if we wouldn't show extended info at all.
-            if (TextUtils.isEmpty(getExtendedInfo())) {
-                return null;
-            }
-
-            if (mBadge == null && mResolveInfo != null && mResolveInfo.activityInfo != null
-                    && mResolveInfo.activityInfo.applicationInfo != null) {
-                if (mResolveInfo.activityInfo.icon == 0 || mResolveInfo.activityInfo.icon
-                        == mResolveInfo.activityInfo.applicationInfo.icon) {
-                    // Badging an icon with exactly the same icon is silly.
-                    // If the activityInfo icon resid is 0 it will fall back
-                    // to the application's icon, making it a match.
-                    return null;
-                }
-                mBadge = mResolveInfo.activityInfo.applicationInfo.loadIcon(mPm);
-            }
-            return mBadge;
+            return null;
         }
 
         @Override
@@ -1416,8 +1366,8 @@ public class ResolverActivity extends Activity {
             } else {
                 mHasExtendedInfo = true;
                 boolean usePkg = false;
-                final ApplicationInfo ai = ro.getResolveInfoAt(0).activityInfo.applicationInfo;
-                final CharSequence startApp = ai.loadLabel(mPm);
+                CharSequence startApp = ro.getResolveInfoAt(0).activityInfo.applicationInfo
+                        .loadLabel(mPm);
                 if (startApp == null) {
                     usePkg = true;
                 }
@@ -1586,10 +1536,7 @@ public class ResolverActivity extends Activity {
 
         private void onBindView(View view, TargetInfo info) {
             final ViewHolder holder = (ViewHolder) view.getTag();
-            final CharSequence label = info.getDisplayLabel();
-            if (!TextUtils.equals(holder.text.getText(), label)) {
-                holder.text.setText(info.getDisplayLabel());
-            }
+            holder.text.setText(info.getDisplayLabel());
             if (showsExtendedInfo(info)) {
                 holder.text2.setVisibility(View.VISIBLE);
                 holder.text2.setText(info.getExtendedInfo());

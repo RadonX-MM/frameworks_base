@@ -117,17 +117,9 @@ static void nFinishBuilder(JNIEnv*, jclass, jlong nativePtr) {
     b->finish();
 }
 
-static jlong nLoadHyphenator(JNIEnv* env, jclass, jobject buffer, jint offset) {
-    const uint8_t* bytebuf = nullptr;
-    if (buffer != nullptr) {
-        void* rawbuf = env->GetDirectBufferAddress(buffer);
-        if (rawbuf != nullptr) {
-            bytebuf = reinterpret_cast<const uint8_t*>(rawbuf) + offset;
-        } else {
-            ALOGE("failed to get direct buffer address");
-        }
-    }
-    Hyphenator* hyphenator = Hyphenator::loadBinary(bytebuf);
+static jlong nLoadHyphenator(JNIEnv* env, jclass, jstring patternData) {
+    ScopedStringChars str(env, patternData);
+    Hyphenator* hyphenator = Hyphenator::load(str.get(), str.size());
     return reinterpret_cast<jlong>(hyphenator);
 }
 
@@ -185,7 +177,7 @@ static JNINativeMethod gMethods[] = {
     {"nNewBuilder", "()J", (void*) nNewBuilder},
     {"nFreeBuilder", "(J)V", (void*) nFreeBuilder},
     {"nFinishBuilder", "(J)V", (void*) nFinishBuilder},
-    {"nLoadHyphenator", "(Ljava/nio/ByteBuffer;I)J", (void*) nLoadHyphenator},
+    {"nLoadHyphenator", "(Ljava/lang/String;)J", (void*) nLoadHyphenator},
     {"nSetLocale", "(JLjava/lang/String;J)V", (void*) nSetLocale},
     {"nSetupParagraph", "(J[CIFIF[IIII)V", (void*) nSetupParagraph},
     {"nSetIndents", "(J[I)V", (void*) nSetIndents},

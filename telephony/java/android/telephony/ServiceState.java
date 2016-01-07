@@ -745,6 +745,8 @@ public class ServiceState implements Parcelable {
                 break;
             case RIL_RADIO_TECHNOLOGY_LTE_CA:
                 rtString = "LTE_CA";
+            case RIL_RADIO_TECHNOLOGY_TD_SCDMA:
+                rtString = "TD-SCDMA";
                 break;
             default:
                 rtString = "Unexpected";

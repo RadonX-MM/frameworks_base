@@ -13743,7 +13743,7 @@ public class PackageManagerService extends IPackageManager.Stub {
             if (ps != null) {
                 libDirRoot = ps.legacyNativeLibraryPathString;
             }
-            if (p != null && (isExternal(p) || p.isForwardLocked())) {
+            if (p != null && (p.isForwardLocked() || p.applicationInfo.isExternalAsec())) {
                 final long token = Binder.clearCallingIdentity();
                 try {
                     String secureContainerId = cidFromCodePath(p.applicationInfo.getBaseCodePath());
